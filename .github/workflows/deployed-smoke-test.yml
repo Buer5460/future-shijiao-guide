@@ -1,0 +1,49 @@
+name: Deployed smoke test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public site and account flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://future-shijiao-guide.zhuxiangbuer.workers.dev'
+          email="github-smoke-${GITHUB_RUN_ID}@example.com"
+          password='SmokeVerify2026x'
+          cookie_jar="${RUNNER_TEMP}/future-shijiao-cookies.txt"
+
+          curl --retry 4 --retry-all-errors --fail --silent --show-error "${base}/" | grep -q '未来仕角'
+
+          register=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
+            --cookie-jar "${cookie_jar}" \
+            --header 'content-type: application/json' \
+            --data "{\"displayName\":\"GitHub 公网验收\",\"email\":\"${email}\",\"password\":\"${password}\",\"returnTo\":\"/account\"}" \
+            "${base}/api/auth/register")
+          grep -q '"ok":true' <<<"${register}"
+
+          saved=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
+            --cookie "${cookie_jar}" \
+            --header 'content-type: application/json' \
+            --data '{"symptom":"头痛 / 头晕","safetyStatus":"non_urgent"}' \
+            "${base}/api/triage-records")
+          grep -q '神经内科' <<<"${saved}"
+
+          curl --retry 4 --retry-all-errors --fail --silent --show-error \
+            --cookie "${cookie_jar}" "${base}/account" | grep -q '头痛 / 头晕'
+
+          curl --retry 4 --retry-all-errors --fail --silent --show-error \
+            --cookie "${cookie_jar}" --cookie-jar "${cookie_jar}" \
+            --header 'content-type: application/json' --data '{"returnTo":"/"}' \
+            "${base}/api/auth/logout" | grep -q '"ok":true'
+
+          login=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
+            --cookie-jar "${cookie_jar}" \
+            --header 'content-type: application/json' \
+            --data "{\"email\":\"${email}\",\"password\":\"${password}\",\"returnTo\":\"/account\"}" \
+            "${base}/api/auth/login")
+          grep -q '"ok":true' <<<"${login}"
+          echo "Verified account: ${email}"
