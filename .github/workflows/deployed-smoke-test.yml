@@ -19,11 +19,18 @@ jobs:
           home=$(curl --retry 4 --retry-all-errors --fail --silent --show-error "${base}/")
           grep -q '未来仕角' <<<"${home}"
 
-          register=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
+          register_file="${RUNNER_TEMP}/future-shijiao-register.json"
+          register_status=$(curl --retry 4 --retry-all-errors --silent --show-error \
             --cookie-jar "${cookie_jar}" \
             --header 'content-type: application/json' \
             --data "{\"displayName\":\"GitHub 公网验收\",\"email\":\"${email}\",\"password\":\"${password}\",\"returnTo\":\"/account\"}" \
+            --output "${register_file}" --write-out '%{http_code}' \
             "${base}/api/auth/register")
+          register=$(<"${register_file}")
+          if [[ "${register_status}" != '201' ]]; then
+            echo "Registration returned HTTP ${register_status}: ${register}"
+            exit 1
+          fi
           grep -q '"ok":true' <<<"${register}"
 
           saved=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \

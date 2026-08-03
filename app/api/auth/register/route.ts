@@ -12,17 +12,27 @@ export async function POST(request: Request) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 160) return Response.json({ error: "请输入有效邮箱" }, { status: 400 });
   if (password.length < 8 || password.length > 128) return Response.json({ error: "密码需为 8–128 个字符" }, { status: 400 });
 
-  const db = getDb();
-  const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
-  if (existing[0]) return Response.json({ error: "该邮箱已注册" }, { status: 409 });
+  let stage = "lookup";
+  try {
+    const db = getDb();
+    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    if (existing[0]) return Response.json({ error: "该邮箱已注册" }, { status: 409 });
 
-  const credential = await hashPassword(password);
-  const [user] = await db.insert(users).values({ authUserId: `local:${crypto.randomUUID()}`, email, displayName }).returning();
-  await db.insert(passwordCredentials).values({ userId: user.id, passwordHash: credential.hash, passwordSalt: credential.salt, iterations: credential.iterations });
-  const session = newSession();
-  await db.insert(userSessions).values({ id: session.token, userId: user.id, expiresAt: session.expiresAt.toISOString() });
-  return Response.json(
-    { ok: true, returnTo: safeReturnTo(body.returnTo) },
-    { status: 201, headers: { "set-cookie": sessionCookie(session.token, session.expiresAt) } },
-  );
+    stage = "password";
+    const credential = await hashPassword(password);
+    stage = "user";
+    const [user] = await db.insert(users).values({ authUserId: `local:${crypto.randomUUID()}`, email, displayName }).returning();
+    stage = "credential";
+    await db.insert(passwordCredentials).values({ userId: user.id, passwordHash: credential.hash, passwordSalt: credential.salt, iterations: credential.iterations });
+    stage = "session";
+    const session = newSession();
+    await db.insert(userSessions).values({ id: session.token, userId: user.id, expiresAt: session.expiresAt.toISOString() });
+    return Response.json(
+      { ok: true, returnTo: safeReturnTo(body.returnTo) },
+      { status: 201, headers: { "set-cookie": sessionCookie(session.token, session.expiresAt) } },
+    );
+  } catch (error) {
+    console.error("registration_failed", stage, error);
+    return Response.json({ error: "注册暂时不可用，请稍后重试", stage }, { status: 500 });
+  }
 }
