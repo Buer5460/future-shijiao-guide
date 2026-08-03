@@ -12,7 +12,7 @@ function departmentFor(symptom: string) {
 
 export async function POST(request: Request) {
   const identity = await getChatGPTUser();
-  if (!identity) return Response.json({ error: "authentication_required", signIn: "/signin-with-chatgpt?return_to=%2F" }, { status: 401 });
+  if (!identity) return Response.json({ error: "authentication_required", signIn: "/login?returnTo=%2F" }, { status: 401 });
   const body = await request.json() as { symptom?: string; safetyStatus?: "non_urgent" | "urgent" };
   const symptom = body.symptom?.trim() ?? "";
   if (!symptom || symptom.length > 500) return Response.json({ error: "invalid_symptom" }, { status: 400 });

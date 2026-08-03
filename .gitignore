@@ -41,3 +41,7 @@ next-env.d.ts
 /outputs/
 /work/
 /xlsx-tools/
+/android/.tooling/
+/android/.gradle/
+/android/**/build/
+/android/outputs/

@@ -1,0 +1,9 @@
+<resources>
+    <style name="FutureShijiaoTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">#FBFCF9</item>
+        <item name="android:navigationBarColor">#FBFCF9</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>

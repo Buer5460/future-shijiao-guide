@@ -32,3 +32,18 @@ export const auditLogs = sqliteTable("audit_logs", {
   targetId: text("target_id"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("idx_audit_logs_actor_created").on(table.actorUserId, table.createdAt)]);
+
+export const passwordCredentials = sqliteTable("password_credentials", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: text("password_hash").notNull(),
+  passwordSalt: text("password_salt").notNull(),
+  iterations: integer("iterations").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const userSessions = sqliteTable("user_sessions", {
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("idx_user_sessions_user_expires").on(table.userId, table.expiresAt)]);

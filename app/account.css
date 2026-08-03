@@ -1,4 +1,8 @@
 .account-link{color:#176b62;text-decoration:none;font-weight:700;font-size:13px}
+.login-page{min-height:100vh;background:radial-gradient(circle at 80% 15%,#d9ebe3 0,transparent 32%),linear-gradient(135deg,#f7f4eb,#f3f8f4);display:grid;place-items:center;padding:24px;color:#173a36}
+.login-card{width:min(100%,460px);background:#fff;border:1px solid #dce5df;border-radius:24px;padding:34px;box-shadow:0 24px 70px rgba(31,74,65,.14)}
+.login-card>.brand{display:flex;margin-bottom:34px}.login-card>.eyebrow{display:block}.login-card h1{font-family:Georgia,"Songti SC",serif;font-size:34px;margin:10px 0}.login-card>p{color:#667a76;line-height:1.7}
+.login-card form{display:grid;gap:15px;margin-top:24px}.login-card label{font-weight:700;font-size:13px}.login-card input{display:block;width:100%;margin-top:7px;border:1px solid #bdd0ca;border-radius:11px;padding:13px;outline-color:#176b62;font:inherit}.form-error{background:#fff0ed;color:#ad402c;border:1px solid #f0c5bb;border-radius:10px;padding:11px;font-size:13px}.mode-switch{width:100%;border:0;background:transparent;color:#176b62;font-weight:700;margin-top:18px}
 .account-page{min-height:100vh;background:#f4f7f3;color:#173a36}
 .account-top{height:78px;background:#fff;border-bottom:1px solid #dce5df;display:flex;align-items:center;justify-content:space-between;padding:0 max(5vw,28px)}
 .account-top a{text-decoration:none}

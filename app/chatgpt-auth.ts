@@ -1,5 +1,10 @@
 import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { and, eq, gt } from "drizzle-orm";
+import { getDb } from "../db";
+import { users, userSessions } from "../db/schema";
+import { SESSION_COOKIE, safeReturnTo } from "./auth";
 
 export type ChatGPTUser = {
   userId: string;
@@ -22,20 +27,28 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);
-  if (!userId || !email) return null;
+  if (userId && email) {
+    const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
+    const fullName =
+      encodedFullName &&
+      requestHeaders.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
+        ? safeDecodeURIComponent(encodedFullName)
+        : null;
+    return { userId, displayName: fullName ?? email, email, fullName };
+  }
 
-  const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
-      ? safeDecodeURIComponent(encodedFullName)
-      : null;
-
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const db = getDb();
+  const [session] = await db.select().from(userSessions).where(and(eq(userSessions.id, token), gt(userSessions.expiresAt, new Date().toISOString()))).limit(1);
+  if (!session) return null;
+  const [localUser] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
+  if (!localUser) return null;
   return {
-    userId,
-    displayName: fullName ?? email,
-    email,
-    fullName,
+    userId: localUser.authUserId,
+    displayName: localUser.displayName,
+    email: localUser.email,
+    fullName: localUser.displayName,
   };
 }
 
@@ -49,28 +62,19 @@ export async function requireChatGPTUser(
 }
 
 export function chatGPTSignInPath(returnTo: string): string {
-  const safeReturnTo = safeRelativeReturnPath(returnTo);
-  return `${SIGN_IN_PATH}?return_to=${encodeURIComponent(safeReturnTo)}`;
+  const destination = safeRelativeReturnPath(returnTo);
+  return `/login?returnTo=${encodeURIComponent(destination)}`;
 }
 
 export function chatGPTSignOutPath(returnTo = "/"): string {
-  const safeReturnTo = safeRelativeReturnPath(returnTo);
-  return `${SIGN_OUT_PATH}?return_to=${encodeURIComponent(safeReturnTo)}`;
+  const destination = safeRelativeReturnPath(returnTo);
+  return `/api/auth/logout?returnTo=${encodeURIComponent(destination)}`;
 }
 
 function safeRelativeReturnPath(value: string): string {
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-
-  let url: URL;
-  try {
-    url = new URL(value, "https://app.local");
-  } catch {
-    return "/";
-  }
-  if (url.origin !== "https://app.local") return "/";
-  if (isReservedAuthPath(url.pathname)) return "/";
-
-  return `${url.pathname}${url.search}${url.hash}`;
+  const safe = safeReturnTo(value, "/");
+  const url = new URL(safe, "https://app.local");
+  return isReservedAuthPath(url.pathname) ? "/" : safe;
 }
 
 function isReservedAuthPath(pathname: string): boolean {
