@@ -16,6 +16,7 @@ public final class FutureShijiaoSdk {
     public static FutureShijiaoConfig getConfig() { return config; }
 
     public static void open(Activity activity) {
+        if (activity == null) throw new IllegalArgumentException("activity must not be null");
         activity.startActivity(new Intent(activity, FutureShijiaoActivity.class));
     }
 }

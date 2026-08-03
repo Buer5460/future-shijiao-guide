@@ -1,6 +1,6 @@
 # 未来仕角 · 智慧导医
 
-可公开演示的 Android/H5 智能导医系统，包含患者前台、独立用户体系、导诊记录和 PC 运营后台演示。
+可公开演示的 Android/H5 智能导医系统，包含患者前台、独立用户体系、导诊记录、PC 运营后台和医院系统集成接口。
 
 ## 在线演示
 
@@ -14,10 +14,17 @@
 - 医疗安全边界：明确非诊断、非处方；危险信号优先提示拨打 120，紧急记录不入库。
 - 用户体系：邮箱注册/登录、PBKDF2 密码哈希、HttpOnly 会话、退出登录。
 - 用户数据：导诊记录按用户隔离，包含审计日志表。
-- PC 管理后台：总览、服务数据、问答、知识库、医院内容、设备和权限日志的可交互演示。
-- Android：最低 Android 5（API 21），目标 Android 16（API 36），同时产出 APK 与 AAR SDK。
+- 前后台联动：医院、科室、医生、位置、宣教、导诊规则、号源和运营指标统一从数据库/API 读取；管理员修改内容后患者端同步更新。
+- 医院接口：主数据、排班号源、预约/取消、候诊队列、HMAC 鉴权、防重放、幂等与同步日志。
+- Android：最低 Android 5（API 21），目标 Android 16（API 36），同时产出 APK 与 AAR SDK；WebView 缺失、渲染进程退出、断网和证书错误均有原生恢复页。
 
-> PC 管理后台目前是汇报演示模块，页面中的运营数字为演示数据，不代表真实医院业务数据。真实上线前需再接医院账号权限、HIS/排班/地图等授权接口。
+> 当前公网数据库中的医院与运营数据是演示数据，不代表真实医院业务。接口和状态机已实现，但正式挂号仍需医院提供 HIS/预约/叫号测试地址、字段和授权凭据。
+
+## 医院对接资料
+
+- 对接说明：[`docs/HOSPITAL_INTEGRATION.md`](docs/HOSPITAL_INTEGRATION.md)
+- OpenAPI 3.1：[`docs/openapi.yaml`](docs/openapi.yaml)
+- 字段与行业模型映射：[`docs/FIELD_MAPPING.md`](docs/FIELD_MAPPING.md)
 
 ## 本地运行
 
@@ -48,7 +55,7 @@ npm run deploy
 
 Android 源码与接入说明见 `android/README.md`。
 
-- 演示 APK：`android/outputs/FutureShijiao-Demo-1.0.0-debug.apk`
-- AAR SDK：`android/outputs/FutureShijiao-Guide-SDK-1.0.0.aar`
+- 演示 APK：`android/outputs/FutureShijiao-Demo-1.1.0-debug.apk`
+- AAR SDK：`android/outputs/FutureShijiao-Guide-SDK-1.1.0.aar`
 
 演示 APK 为调试签名；医院正式发布版本需要使用企业自有签名证书。

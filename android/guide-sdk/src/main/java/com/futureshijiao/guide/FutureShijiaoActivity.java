@@ -40,6 +40,16 @@ public final class FutureShijiaoActivity extends Activity {
         else super.onBackPressed();
     }
 
+    @Override protected void onPause() {
+        if (guideView != null) guideView.onHostPause();
+        super.onPause();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (guideView != null) guideView.onHostResume();
+    }
+
     @Override protected void onDestroy() {
         if (guideView != null) guideView.destroy();
         super.onDestroy();

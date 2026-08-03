@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: 未来仕角智慧导医 API
+  version: 1.1.0
+  description: 患者端、管理端与医院集成适配器的统一接口。预约成功仅以医院回传 confirmed 为准。
+servers:
+  - url: https://future-shijiao-guide.zhuxiangbuer.workers.dev
+    description: 公网演示环境
+tags:
+  - name: Patient
+  - name: Admin
+  - name: Hospital Integration
+paths:
+  /api/v1/catalog:
+    get:
+      tags: [Patient]
+      summary: 获取医院展示主数据
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /api/v1/triage/recommendations:
+    post:
+      tags: [Patient]
+      summary: 危险信号判断与科室推荐
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symptom]
+              properties:
+                symptom: { type: string, minLength: 1, maxLength: 500, example: "头晕两天，站起来时明显" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/v1/schedules:
+    get:
+      tags: [Patient]
+      summary: 查询医院号源
+      parameters:
+        - { in: query, name: departmentCode, schema: { type: string }, description: 医院科室编码 }
+        - { in: query, name: date, schema: { type: string, format: date }, description: 起始日期 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/appointments:
+    get:
+      tags: [Patient]
+      summary: 获取当前用户预约
+      security: [{ cookieAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      tags: [Patient]
+      summary: 创建预约申请
+      description: 返回 202/pending；医院回传 confirmed 后才成功。
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { in: header, name: Idempotency-Key, schema: { type: string, maxLength: 100 }, required: false }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scheduleId]
+              properties:
+                scheduleId: { type: string }
+                requestId: { type: string, maxLength: 100, description: 与 Idempotency-Key 二选一 }
+      responses:
+        "202": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/appointments/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      tags: [Patient]
+      summary: 查询单个预约状态
+      security: [{ cookieAuth: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [Patient]
+      summary: 申请取消预约
+      security: [{ cookieAuth: [] }]
+      responses:
+        "202": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/v1/appointments/{id}/queue:
+    get:
+      tags: [Patient]
+      summary: 查询候诊队列
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/admin/overview:
+    get:
+      tags: [Admin]
+      summary: 运营总览
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { in: query, name: demo, schema: { type: string, enum: ["1"] }, description: 公开演示模式只返回脱敏汇总 }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/v1/admin/content/{entity}/{id}:
+    patch:
+      tags: [Admin]
+      summary: 更新医院内容并同步到患者端
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { in: path, name: entity, required: true, schema: { type: string, enum: [departments, doctors, knowledge] } }
+        - { in: path, name: id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/v1/integration/appointments:
+    get:
+      tags: [Hospital Integration]
+      summary: 医院适配器拉取待预约/待取消订单
+      security: [{ hospitalHmac: [] }]
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [pending, cancel_requested] } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /api/v1/integration/sync:
+    post:
+      tags: [Hospital Integration]
+      summary: 医院主数据、号源、预约状态和队列增量同步
+      security: [{ hospitalHmac: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncRequest"
+            examples:
+              department:
+                value:
+                  requestId: "01J-sync-001"
+                  resourceType: department
+                  items:
+                    - id: dept-001
+                      hospitalId: hospital-001
+                      code: CARD
+                      name: 心血管内科
+                      floor: 门诊楼 3F
+                      description: 心血管疾病门诊
+              appointmentStatus:
+                value:
+                  requestId: "01J-status-001"
+                  resourceType: appointment_status
+                  items:
+                    - appointmentId: "40fc66d5-6a30-4b14-9757-0ae25cbe6bb2"
+                      externalAppointmentId: HIS-20260804-0001
+                      status: confirmed
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "207": { description: 部分条目失败, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: fsj_session
+    hospitalHmac:
+      type: apiKey
+      in: header
+      name: X-FSJ-Signature
+      description: 还需 X-FSJ-Client-Id、X-FSJ-Timestamp、X-FSJ-Nonce；签名算法见对接说明。
+  schemas:
+    SyncRequest:
+      type: object
+      required: [requestId, resourceType, items]
+      properties:
+        requestId: { type: string, minLength: 1, maxLength: 100 }
+        resourceType:
+          type: string
+          enum: [hospital, department, doctor, location, knowledge, schedule, appointment_status, queue]
+        items:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { type: object, additionalProperties: true }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Success:
+      description: 成功
+      content:
+        application/json:
+          schema: { type: object, additionalProperties: true }
+    Error:
+      description: 失败
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

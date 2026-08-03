@@ -11,6 +11,7 @@
 - 目标 Android 16（API 36）。
 - 支持手机、平板、机器人横屏/竖屏和系统字体缩放。
 - 需要设备安装并启用 Android System WebView，且能访问部署域名。
+- WebView 缺失、初始化失败、渲染进程退出、断网、服务端 5xx 和 SSL 校验失败时显示原生恢复页，不让异常直接终止应用。
 
 ## AAR 集成
 
@@ -44,3 +45,10 @@ gradle :guide-sdk:assembleRelease :demo-app:assembleDebug
 ```
 
 演示 APK 使用 Android 调试证书签名，可直接安装测试；正式上架前应改用企业自有签名证书生成 release APK/AAB。
+
+设备仍有异常时可用以下命令采集日志（不包含网页密码）：
+
+```bash
+adb logcat -c
+adb logcat FutureShijiao:E AndroidRuntime:E '*:S'
+```

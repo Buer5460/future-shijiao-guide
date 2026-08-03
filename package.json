@@ -12,7 +12,7 @@
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "db:deploy": "wrangler d1 execute future-shijiao-guide-db --remote --file=drizzle/0000_typical_blue_shield.sql",
+    "db:deploy": "wrangler d1 execute future-shijiao-guide-db --config wrangler.deploy.jsonc --remote --file=drizzle/0000_typical_blue_shield.sql",
     "deploy": "npm run build && wrangler deploy --config wrangler.deploy.jsonc"
   },
   "dependencies": {
