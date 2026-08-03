@@ -1,4 +1,4 @@
-const PASSWORD_ITERATIONS = 210_000;
+const PASSWORD_ITERATIONS = 100_000;
 const SESSION_DAYS = 7;
 
 export const SESSION_COOKIE = "fsj_session";
