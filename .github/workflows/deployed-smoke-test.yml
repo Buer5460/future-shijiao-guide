@@ -16,7 +16,8 @@ jobs:
           password='SmokeVerify2026x'
           cookie_jar="${RUNNER_TEMP}/future-shijiao-cookies.txt"
 
-          curl --retry 4 --retry-all-errors --fail --silent --show-error "${base}/" | grep -q '未来仕角'
+          home=$(curl --retry 4 --retry-all-errors --fail --silent --show-error "${base}/")
+          grep -q '未来仕角' <<<"${home}"
 
           register=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
             --cookie-jar "${cookie_jar}" \
@@ -32,13 +33,15 @@ jobs:
             "${base}/api/triage-records")
           grep -q '神经内科' <<<"${saved}"
 
-          curl --retry 4 --retry-all-errors --fail --silent --show-error \
-            --cookie "${cookie_jar}" "${base}/account" | grep -q '头痛 / 头晕'
+          account=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
+            --cookie "${cookie_jar}" "${base}/account")
+          grep -q '头痛 / 头晕' <<<"${account}"
 
-          curl --retry 4 --retry-all-errors --fail --silent --show-error \
+          logout=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
             --cookie "${cookie_jar}" --cookie-jar "${cookie_jar}" \
             --header 'content-type: application/json' --data '{"returnTo":"/"}' \
-            "${base}/api/auth/logout" | grep -q '"ok":true'
+            "${base}/api/auth/logout")
+          grep -q '"ok":true' <<<"${logout}"
 
           login=$(curl --retry 4 --retry-all-errors --fail --silent --show-error \
             --cookie-jar "${cookie_jar}" \
