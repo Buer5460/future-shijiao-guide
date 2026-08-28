@@ -42,12 +42,14 @@ test("protects accounts and persists user-scoped triage records", async () => {
 });
 
 test("ships hospital content without publishing stale insurance rates", async () => {
-  const [catalog, migration, offline, offlineData, androidConfig] = await Promise.all([
+  const [catalog, migration, offline, offlineData, androidConfig, androidManifest, androidBuild] = await Promise.all([
     source("../data/qbj-hospital.json"),
     source("../drizzle/0001_qbj_hospital_content.sql"),
     source("../android/guide-sdk/src/main/assets/future_shijiao_offline.html"),
     source("../android/guide-sdk/src/main/assets/qbj-hospital-data.js"),
     source("../android/demo-app/src/main/java/com/futureshijiao/guide/demo/MainActivity.java"),
+    source("../android/demo-app/src/main/AndroidManifest.xml"),
+    source("../android/demo-app/build.gradle"),
   ]);
   const data = JSON.parse(catalog);
   assert.equal(data.departments.length, 44);
@@ -60,5 +62,10 @@ test("ships hospital content without publishing stale insurance rates", async ()
   assert.match(offline, /成都市青白江区人民医院/);
   assert.match(offline, /qbj-hospital-data\.js/);
   assert.match(offlineData, /window\.HOSPITAL_DATA=/);
+  assert.match(offlineData, /hospital\/maps\/outpatient-3f\.webp/);
   assert.match(androidConfig, /offlineOnly\(true\)/);
+  assert.match(androidManifest, /android\.permission\.INTERNET/);
+  assert.match(androidManifest, /android\.permission\.ACCESS_NETWORK_STATE/);
+  assert.match(androidBuild, /versionCode 6/);
+  assert.match(androidBuild, /versionName "1\.4\.1"/);
 });

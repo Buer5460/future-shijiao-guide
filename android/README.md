@@ -11,6 +11,7 @@
 - 目标 Android 16（API 36）。
 - 支持手机、平板、1920×1080 机器人横屏/竖屏、分屏和系统字体缩放。
 - 演示 APK 强制使用本机离线模式，不请求公网；内置 44 个科室、181 名医生、47 个位置、9 张院方楼层图和 5 类就医流程。
+- 1.4.1 兼容版保留已确认可安装的 1.2.0 Manifest 与权限声明，离线地图改为兼容 WebP，APK 约 370KB；权限声明仅用于保持定制安装器的升级结构一致，演示配置仍为 `offlineOnly(true)`。
 - WebView 缺失、初始化失败或渲染进程退出时显示原生恢复页，不让异常直接终止应用。
 - RK3576 等 Rockchip 设备自动使用软件渲染，规避部分定制 GPU/WebView 的启动崩溃。
 
@@ -35,7 +36,7 @@ FutureShijiaoSdk.initialize(
 FutureShijiaoSdk.open(this);
 ```
 
-`offlineOnly(true)` 下不需要网络，导诊记录只写入设备 WebView 本机存储，不上传服务器。SDK 不申请相机、麦克风、定位或存储权限。若医院后续需要接入 HIS，可改为在线地址并由宿主应用声明 `android.permission.INTERNET`。
+`offlineOnly(true)` 下不需要网络，导诊记录只写入设备 WebView 本机存储，不上传服务器。SDK 不申请相机、麦克风、定位或存储权限。兼容演示 APK 为保持 1.2.0 安装结构声明了网络权限，但不会发起网络请求；若医院后续需要接入 HIS，可改为在线地址。
 
 ## 本地构建
 
