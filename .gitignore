@@ -46,3 +46,5 @@ next-env.d.ts
 /android/.gradle/
 /android/**/build/
 /android/outputs/
+/.playwright-cli/
+/output/

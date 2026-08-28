@@ -27,12 +27,9 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-
 public final class GuideWebView extends FrameLayout {
     private static final String TAG = "FutureShijiao";
+    private static final String LOCAL_ASSET_URL = "file:///android_asset/future_shijiao_offline.html";
 
     private WebView webView;
     private final ProgressBar progress;
@@ -82,8 +79,10 @@ public final class GuideWebView extends FrameLayout {
         errorPanel.addView(errorTitle);
         errorPanel.addView(errorMessage);
         errorPanel.addView(retry, new LinearLayout.LayoutParams(dp(220), dp(52)));
-        errorPanel.addView(browser, new LinearLayout.LayoutParams(dp(220), dp(52)));
-        errorPanel.addView(settings, new LinearLayout.LayoutParams(dp(220), dp(52)));
+        if (!config.isOfflineOnly()) {
+            errorPanel.addView(browser, new LinearLayout.LayoutParams(dp(220), dp(52)));
+            errorPanel.addView(settings, new LinearLayout.LayoutParams(dp(220), dp(52)));
+        }
         errorPanel.setVisibility(GONE);
         addView(errorPanel, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
@@ -100,17 +99,25 @@ public final class GuideWebView extends FrameLayout {
         try {
             WebView next = new WebView(getContext());
             next.setBackgroundColor(0xFFFBFCF9);
+            next.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            next.setVerticalScrollBarEnabled(false);
+            next.setHorizontalScrollBarEnabled(false);
             if (isRockchipDevice()) next.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             WebSettings settings = next.getSettings();
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
-            settings.setAllowFileAccess(false);
+            settings.setAllowFileAccess(true);
             settings.setAllowContentAccess(false);
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
             settings.setMediaPlaybackRequiresUserGesture(true);
             settings.setTextZoom(100);
-            settings.setUserAgentString(settings.getUserAgentString() + " FutureShijiaoAndroid/1.1");
+            settings.setUseWideViewPort(true);
+            settings.setLoadWithOverviewMode(false);
+            settings.setSupportZoom(false);
+            settings.setBuiltInZoomControls(false);
+            settings.setDisplayZoomControls(false);
+            settings.setUserAgentString(settings.getUserAgentString() + " FutureShijiaoAndroid/1.4");
             if (Build.VERSION.SDK_INT >= 26) settings.setSafeBrowsingEnabled(true);
 
             CookieManager cookies = CookieManager.getInstance();
@@ -126,13 +133,14 @@ public final class GuideWebView extends FrameLayout {
             next.setWebViewClient(Build.VERSION.SDK_INT >= 26 ? new SecureClientApi26() : new SecureClient());
             webView = next;
             addView(next, 0, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            next.loadUrl(config.getBaseUrl());
+            if (config.isOfflineOnly()) loadOfflineFallback("设备本机模式");
+            else next.loadUrl(config.getBaseUrl());
         } catch (Throwable error) {
             Log.e(TAG, "Unable to create Android WebView", error);
             disposeWebView();
             showError(
                 "系统网页组件不可用",
-                "请更新或启用 Android System WebView；也可以使用系统浏览器继续演示。"
+                "请在系统设置中启用 Android System WebView 后，重新打开应用。"
             );
         }
     }
@@ -151,24 +159,10 @@ public final class GuideWebView extends FrameLayout {
         Log.w(TAG, "Loading offline demo: " + reason);
         offlineFallbackLoaded = true;
         try {
-            StringBuilder html = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                getContext().getAssets().open("future_shijiao_offline.html"),
-                StandardCharsets.UTF_8
-            ))) {
-                String line;
-                while ((line = reader.readLine()) != null) html.append(line).append('\n');
-            }
-            webView.loadDataWithBaseURL(
-                "https://offline.future-shijiao.local/",
-                html.toString(),
-                "text/html",
-                "UTF-8",
-                null
-            );
+            webView.loadUrl(LOCAL_ASSET_URL);
         } catch (Throwable error) {
             Log.e(TAG, "Offline fallback failed", error);
-            showError("无法加载离线演示", "请检查系统 WebView，或连接网络后点击重新加载。");
+            showError("无法加载本机资料", "请检查系统 WebView，或重新安装完整 APK 后点击重新加载。");
         }
     }
 
@@ -208,6 +202,11 @@ public final class GuideWebView extends FrameLayout {
         startActivitySafely(new Intent(Intent.ACTION_VIEW, uri));
     }
 
+    private boolean isLocalAsset(Uri uri) {
+        return uri != null && "file".equalsIgnoreCase(uri.getScheme())
+            && uri.toString().startsWith("file:///android_asset/");
+    }
+
     private void startActivitySafely(Intent intent) {
         try {
             if (!(getContext() instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -242,20 +241,22 @@ public final class GuideWebView extends FrameLayout {
 
         @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             Uri uri = request.getUrl();
-            if (config.isAllowed(uri)) return false;
+            if (isLocalAsset(uri) || config.isAllowed(uri)) return false;
             openExternal(uri);
             return true;
         }
 
         @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
             Uri uri = Uri.parse(url);
-            if (config.isAllowed(uri)) return false;
+            if (isLocalAsset(uri) || config.isAllowed(uri)) return false;
             openExternal(uri);
             return true;
         }
 
         @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            if (request.isForMainFrame()) loadOfflineFallback("网络错误 " + error.getErrorCode());
+            if (!request.isForMainFrame()) return;
+            if (isLocalAsset(request.getUrl())) showError("本机资料加载失败", "请重新安装完整 APK，或联系设备管理员检查应用文件。");
+            else loadOfflineFallback("网络错误 " + error.getErrorCode());
         }
 
         @SuppressWarnings("deprecation")
@@ -266,7 +267,7 @@ public final class GuideWebView extends FrameLayout {
         }
 
         @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
-            if (request.isForMainFrame() && response.getStatusCode() >= 500) {
+            if (request.isForMainFrame() && !isLocalAsset(request.getUrl()) && response.getStatusCode() >= 500) {
                 loadOfflineFallback("服务返回 " + response.getStatusCode());
             }
         }

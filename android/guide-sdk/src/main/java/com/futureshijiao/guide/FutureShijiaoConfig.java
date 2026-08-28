@@ -10,6 +10,7 @@ public final class FutureShijiaoConfig {
     private final String baseUrl;
     private final Set<String> allowedHosts;
     private final boolean openExternalLinks;
+    private final boolean offlineOnly;
 
     private FutureShijiaoConfig(Builder builder) {
         Uri uri = Uri.parse(builder.baseUrl);
@@ -21,11 +22,13 @@ public final class FutureShijiaoConfig {
         hosts.add(uri.getHost().toLowerCase());
         this.allowedHosts = Collections.unmodifiableSet(hosts);
         this.openExternalLinks = builder.openExternalLinks;
+        this.offlineOnly = builder.offlineOnly;
     }
 
     public String getBaseUrl() { return baseUrl; }
     public Set<String> getAllowedHosts() { return allowedHosts; }
     public boolean shouldOpenExternalLinks() { return openExternalLinks; }
+    public boolean isOfflineOnly() { return offlineOnly; }
 
     public boolean isAllowed(Uri uri) {
         return uri != null && "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null
@@ -36,10 +39,12 @@ public final class FutureShijiaoConfig {
         private String baseUrl = "https://future-shijiao-guide.zhuxiangbuer.workers.dev";
         private final Set<String> allowedHosts = new HashSet<>();
         private boolean openExternalLinks = true;
+        private boolean offlineOnly;
 
         public Builder baseUrl(String value) { this.baseUrl = value; return this; }
         public Builder allowHost(String value) { if (value != null) allowedHosts.add(value.toLowerCase()); return this; }
         public Builder openExternalLinks(boolean value) { this.openExternalLinks = value; return this; }
+        public Builder offlineOnly(boolean value) { this.offlineOnly = value; return this; }
         public FutureShijiaoConfig build() { return new FutureShijiaoConfig(this); }
     }
 }

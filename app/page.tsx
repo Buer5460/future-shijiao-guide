@@ -1,37 +1,55 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- hospital floor maps must load directly in Android WebView and Cloudflare Workers */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import hospitalData from "../data/qbj-hospital.json";
 
-type View = "home" | "triage" | "guide" | "departments" | "doctors" | "hospital" | "education" | "nearby" | "admin";
+type View = "home" | "triage" | "guide" | "departments" | "doctors" | "hospital" | "education" | "admin";
 
-const services = [
-  { id: "triage", icon: "✦", title: "智能导诊", sub: "描述症状，推荐科室", tone: "coral" },
-  { id: "guide", icon: "⌁", title: "院内导航", sub: "查地点与行走路线", tone: "blue" },
-  { id: "departments", icon: "＋", title: "科室介绍", sub: "特色专科与楼层", tone: "mint" },
-  { id: "doctors", icon: "♙", title: "医生介绍", sub: "擅长方向与出诊时间", tone: "violet" },
-  { id: "hospital", icon: "▥", title: "医院介绍", sub: "了解医院与就医流程", tone: "amber" },
-  { id: "education", icon: "♡", title: "健康宣教", sub: "科学、易懂的健康知识", tone: "pink" },
-] as const;
+type Department = {
+  id: string;
+  code: string;
+  icon: string;
+  name: string;
+  floor: string;
+  desc: string;
+  specialty: string;
+};
 
-const fallbackDepartments = [
-  { icon: "🫀", name: "心血管内科", floor: "门诊楼 3F", desc: "胸闷、心悸、高血压等相关疾病" },
-  { icon: "🦴", name: "骨科", floor: "门诊楼 4F", desc: "骨关节、脊柱、运动损伤" },
-  { icon: "🧠", name: "神经内科", floor: "门诊楼 3F", desc: "头痛、眩晕、肢体麻木" },
-  { icon: "👶", name: "儿科", floor: "门诊楼 2F", desc: "儿童常见病与生长发育" },
-];
+type Doctor = {
+  id: string;
+  code: string;
+  name: string;
+  dept: string;
+  deptCode: string;
+  rank: string;
+  skill: string;
+  profile: string;
+  time: string;
+  color: string;
+  source: string;
+};
 
-const fallbackDoctors = [
-  { name: "周明远", dept: "心血管内科", rank: "主任医师", skill: "冠心病、高血压及心律失常", time: "周一、周三上午", color: "#3a7d74" },
-  { name: "林  悦", dept: "神经内科", rank: "副主任医师", skill: "头痛、眩晕与脑血管病", time: "周二、周四下午", color: "#795c5c" },
-  { name: "陈思齐", dept: "骨科", rank: "主任医师", skill: "关节损伤、脊柱与运动医学", time: "周一、周五上午", color: "#536b8c" },
-];
+type Location = { id: string; code: string; name: string; building: string; floor: string; zone: string; description: string };
+type FloorMap = { id: string; name: string; building: string; floor: string; image: string; summary: string };
+type Process = { id: string; title: string; source: string; steps: string[] };
+type Article = { id: string; category: string; title: string; summary: string; content: string; updatedAt?: string };
+type HospitalProfile = {
+  description: string;
+  servicePhone: string;
+  source: string;
+  stats: { beds: number; plannedBeds: number; employees: number; specialtyCenters: number; buildingArea: string };
+};
 
 type Catalog = {
-  hospital: { name: string; address: string };
-  departments: typeof fallbackDepartments;
-  doctors: typeof fallbackDoctors;
-  locations: Array<{ id: string; name: string; building: string; floor: string; zone: string; description: string }>;
-  knowledgeArticles: Array<{ id: string; category: string; title: string; summary: string; updatedAt?: string }>;
+  hospital: { id?: string; name: string; shortName?: string; address: string; emergencyPhone?: string };
+  profile: HospitalProfile;
+  departments: Department[];
+  doctors: Doctor[];
+  locations: Location[];
+  maps: FloorMap[];
+  processes: Process[];
+  knowledgeArticles: Article[];
 };
 
 type AdminOverview = {
@@ -41,130 +59,199 @@ type AdminOverview = {
   integration: { status: string };
 };
 
-const fallbackCatalog: Catalog = {
-  hospital: { name: "安和市第一人民医院（演示）", address: "安和市健康路 1 号" },
-  departments: fallbackDepartments,
-  doctors: fallbackDoctors,
-  locations: [
-    { id: "lobby", name: "门诊大厅", building: "门诊楼", floor: "1F", zone: "", description: "办卡、咨询与自助服务" },
-    { id: "cardio", name: "心血管内科", building: "门诊楼", floor: "3F", zone: "A 区", description: "2 号电梯到 3F 后左转" },
-    { id: "lab", name: "检验科", building: "医技楼", floor: "2F", zone: "", description: "门诊采血与检验" },
-    { id: "pharmacy", name: "药房", building: "门诊楼", floor: "1F", zone: "西侧", description: "门诊取药窗口" },
-  ],
-  knowledgeArticles: [
-    { id: "heat", category: "季节健康", title: "夏季防暑的 6 个要点", summary: "补充水分、避免高温时段外出，识别中暑信号。" },
-    { id: "bp", category: "慢病管理", title: "居家测量血压怎么做", summary: "测量前安静休息，规范姿势并记录趋势。" },
-    { id: "wound", category: "术后护理", title: "出院后伤口观察指南", summary: "保持清洁干燥，关注红肿、渗液与发热。" },
-    { id: "child", category: "儿童健康", title: "儿童发热家庭观察要点", summary: "关注精神状态、饮水和呼吸情况。" },
-  ],
+const icons: Record<string, string> = {
+  CARD: "心", ORTHO: "骨", NEURO: "脑", PED: "儿", EMERGENCY: "急", RESP: "呼",
+  GASTRO: "消", TCM: "中", OBGYN: "妇", ENT_OPHTH: "眼", STOMATOLOGY: "口",
 };
 
-type CatalogPayload = { data: { hospital: Catalog["hospital"]; departments: Array<{ code: string; name: string; floor: string; zone: string; description: string }>; doctors: Array<{ name: string; departmentName: string; title: string; specialty: string; scheduleText: string; avatarColor: string }>; locations: Catalog["locations"]; knowledgeArticles: Catalog["knowledgeArticles"] } };
+const staticDoctorByCode = new Map(hospitalData.doctors.map((doctor) => [doctor.code, doctor]));
+const staticDepartmentByCode = new Map(hospitalData.departments.map((department) => [department.code, department]));
+
+const fallbackCatalog: Catalog = {
+  hospital: hospitalData.hospital,
+  profile: {
+    description: hospitalData.hospital.description,
+    servicePhone: hospitalData.hospital.servicePhone,
+    source: hospitalData.hospital.source,
+    stats: hospitalData.hospital.stats,
+  },
+  departments: hospitalData.departments.map((item) => ({
+    id: item.id,
+    code: item.code,
+    icon: icons[item.code] || "科",
+    name: item.name,
+    floor: `${item.floor}${item.zone ? ` · ${item.zone}` : ""}`,
+    desc: item.description,
+    specialty: item.specialty,
+  })),
+  doctors: hospitalData.doctors.map((item) => ({
+    id: item.id,
+    code: item.code,
+    name: item.name,
+    dept: item.departmentName,
+    deptCode: item.departmentCode,
+    rank: item.title,
+    skill: item.specialty,
+    profile: item.profile,
+    time: item.scheduleText,
+    color: item.avatarColor,
+    source: item.source,
+  })),
+  locations: hospitalData.locations,
+  maps: hospitalData.maps,
+  processes: hospitalData.processes,
+  knowledgeArticles: hospitalData.knowledgeArticles.filter((item) => item.status === "published"),
+};
+
+type CatalogPayload = {
+  data: {
+    hospital: Catalog["hospital"];
+    profile?: Catalog["profile"];
+    departments: Array<{ id: string; code: string; name: string; floor: string; zone: string; description: string; specialty: string }>;
+    doctors: Array<{ id: string; code: string; name: string; departmentName: string; departmentId: string; title: string; specialty: string; scheduleText: string; avatarColor: string }>;
+    locations: Location[];
+    maps?: FloorMap[];
+    processes?: Process[];
+    knowledgeArticles: Article[];
+  };
+};
 
 async function fetchCatalog(): Promise<Catalog | null> {
   const response = await fetch("/api/v1/catalog");
   if (!response.ok) return null;
   const payload = await response.json() as CatalogPayload;
-  const icons: Record<string, string> = { CARD: "🫀", ORTHO: "🦴", NEURO: "🧠", PED: "👶", GENERAL: "✦" };
   return {
     hospital: payload.data.hospital,
-    departments: payload.data.departments.map((item) => ({ icon: icons[item.code] || "＋", name: item.name, floor: `${item.floor}${item.zone ? ` · ${item.zone}` : ""}`, desc: item.description })),
-    doctors: payload.data.doctors.map((item) => ({ name: item.name, dept: item.departmentName, rank: item.title, skill: item.specialty, time: item.scheduleText, color: item.avatarColor })),
+    profile: payload.data.profile || fallbackCatalog.profile,
+    departments: payload.data.departments.map((item) => {
+      const local = staticDepartmentByCode.get(item.code);
+      return {
+        id: item.id,
+        code: item.code,
+        icon: icons[item.code] || "科",
+        name: item.name,
+        floor: `${item.floor}${item.zone ? ` · ${item.zone}` : ""}`,
+        desc: item.description,
+        specialty: item.specialty || local?.specialty || "",
+      };
+    }),
+    doctors: payload.data.doctors.map((item) => {
+      const local = staticDoctorByCode.get(item.code);
+      return {
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        dept: item.departmentName,
+        deptCode: local?.departmentCode || item.departmentId,
+        rank: item.title,
+        skill: local?.specialty || item.specialty,
+        profile: item.specialty || local?.profile || "",
+        time: item.scheduleText,
+        color: item.avatarColor,
+        source: local?.source || "医院主数据接口",
+      };
+    }),
     locations: payload.data.locations,
+    maps: payload.data.maps || fallbackCatalog.maps,
+    processes: payload.data.processes || fallbackCatalog.processes,
     knowledgeArticles: payload.data.knowledgeArticles,
   };
 }
 
+const services: Array<{ id: Exclude<View, "home" | "admin">; icon: string; title: string; sub: string; tone: string }> = [
+  { id: "triage", icon: "✦", title: "智能导诊", sub: "描述症状，匹配院内科室", tone: "coral" },
+  { id: "guide", icon: "⌁", title: "院内地图", sub: "查看院方真实楼层图", tone: "blue" },
+  { id: "departments", icon: "科", title: "科室介绍", sub: "44 个科室与特色技术", tone: "mint" },
+  { id: "doctors", icon: "医", title: "医生介绍", sub: "181 位医生与出诊资料", tone: "violet" },
+  { id: "hospital", icon: "院", title: "就医流程", sub: "挂号、就诊与急诊指引", tone: "amber" },
+  { id: "education", icon: "阅", title: "政策宣教", sub: "院方资料，标注来源日期", tone: "pink" },
+];
+
 export default function Home() {
   const [view, setView] = useState<View>("home");
-  const [triageStep, setTriageStep] = useState(0);
-  const [symptom, setSymptom] = useState("");
-  const [selectedSymptom, setSelectedSymptom] = useState("");
   const [catalog, setCatalog] = useState<Catalog>(fallbackCatalog);
-
   const refreshCatalog = useCallback(async () => {
     try {
-      const nextCatalog = await fetchCatalog();
-      if (nextCatalog) setCatalog(nextCatalog);
-    } catch { /* 保留内置离线演示数据 */ }
+      const next = await fetchCatalog();
+      if (next) setCatalog(next);
+    } catch { /* 保留 APK 内置医院目录 */ }
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void fetchCatalog().then((nextCatalog) => {
-      if (!cancelled && nextCatalog) setCatalog(nextCatalog);
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    let active = true;
+    void fetchCatalog().then((next) => {
+      if (active && next) setCatalog(next);
+    }).catch(() => { /* 保留 APK 内置医院目录 */ });
+    return () => { active = false; };
   }, []);
-
-  const open = (next: View) => { setView(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const open = (next: View) => { setView(next); window.scrollTo({ top: 0, behavior: "instant" }); };
 
   if (view === "admin") return <Admin catalog={catalog} refreshCatalog={refreshCatalog} onExit={() => open("home")} />;
 
-  return (
-    <main className="site-shell">
-      <header className="topbar">
-        <button className="brand" onClick={() => open("home")} aria-label="返回首页">
-          <span className="brand-mark">角</span><span><b>未来仕角</b><small>安心就医 · 一路相伴</small></span>
-        </button>
-        <div className="top-actions"><span className="status"><i /> 服务在线</span><a className="account-link" href="/account">登录 / 我的记录</a><button className="admin-link" onClick={() => open("admin")}>PC 管理后台演示</button></div>
-      </header>
+  return <main className="site-shell">
+    <header className="topbar">
+      <button className="brand" onClick={() => open("home")} aria-label="返回首页">
+        <span className="brand-mark">角</span>
+        <span><b>未来仕角</b><small>{catalog.hospital.shortName || "智慧导医服务"}</small></span>
+      </button>
+      <div className="top-actions">
+        <span className="status"><i /> 医院资料已载入</span>
+        <a className="phone-link" href={`tel:${catalog.profile.servicePhone}`}>咨询 {catalog.profile.servicePhone}</a>
+        <a className="account-link" href="/account">登录 / 我的记录</a>
+        <button className="admin-link" onClick={() => open("admin")}>PC 管理后台</button>
+      </div>
+    </header>
 
-      {view === "home" ? (
-        <>
-          <section className="hero">
-            <div className="hero-copy">
-              <span className="eyebrow">AI 智慧导诊服务</span>
-              <h1>您好，我是小安<br />您的智能导医助手</h1>
-              <p>从症状描述到科室推荐，从院内路线到就医流程，<br className="desktop" />让每一次就医更从容、更清楚。</p>
-              <div className="hero-buttons">
-                <button className="primary" onClick={() => open("triage")}><span>✦</span> 开始智能导诊</button>
-                <button className="secondary" onClick={() => open("guide")}>⌁ 查询院内位置</button>
-              </div>
-              <p className="safe-note">ⓘ 本服务仅提供就医引导，不替代医生诊断；危急情况请立即拨打 120。</p>
-            </div>
-            <div className="hero-visual" aria-hidden="true">
-              <div className="orbit orbit-one" /><div className="orbit orbit-two" />
-              <div className="bot"><span className="bot-cross">＋</span><i className="eye left"/><i className="eye right"/><div className="smile"/></div>
-              <div className="float-card card-one"><b>已为您找到</b><span>心血管内科 · 门诊楼 3F</span></div>
-              <div className="float-card card-two"><b>路线已规划</b><span>预计步行 4 分钟</span></div>
-            </div>
-          </section>
+    {view === "home" ? <HomePage catalog={catalog} open={open} /> : view === "triage" ? <Triage onBack={() => open("home")} /> : <ModulePage view={view} catalog={catalog} onBack={() => open("home")} onOpen={open} />}
 
-          <section className="section services-section">
-            <div className="section-head"><div><span className="eyebrow">常用服务</span><h2>今天需要什么帮助？</h2></div><p>覆盖就诊前、中、后的常见需求</p></div>
-            <div className="service-grid">
-              {services.map((item) => <button key={item.id} className="service-card" onClick={() => open(item.id)}><span className={`service-icon ${item.tone}`}>{item.icon}</span><span><b>{item.title}</b><small>{item.sub}</small></span><i>→</i></button>)}
-            </div>
-          </section>
-
-          <section className="section quick-section">
-            <div className="quick-copy"><span className="eyebrow">办事不迷路</span><h2>常用流程，一看就懂</h2><p>把复杂的就医步骤，整理成清晰的行动清单。</p></div>
-            <div className="quick-list">
-              {["初次就诊办卡流程","门诊预约与取号","入院手续办理","检查报告查询"].map((x, i) => <button key={x} onClick={() => open("hospital")}><span>0{i+1}</span><b>{x}</b><i>→</i></button>)}
-            </div>
-          </section>
-
-          <footer><span>未来仕角 · 智慧导医演示版</span><span>无障碍服务　|　隐私说明　|　联系我们</span></footer>
-          <nav className="mobile-nav"><button className="active" onClick={() => open("home")}>⌂<span>首页</span></button><button onClick={() => open("triage")}>✦<span>导诊</span></button><button onClick={() => open("guide")}>⌁<span>导航</span></button><button onClick={() => open("hospital")}>☷<span>服务</span></button></nav>
-        </>
-      ) : view === "triage" ? (
-        <Triage step={triageStep} setStep={setTriageStep} symptom={symptom} setSymptom={setSymptom} selected={selectedSymptom} setSelected={setSelectedSymptom} onBack={() => open("home")} />
-      ) : (
-        <ModulePage view={view} catalog={catalog} onBack={() => open("home")} onOpen={open} />
-      )}
-    </main>
-  );
+    <nav className="mobile-nav" aria-label="手机快捷导航">
+      <button className={view === "home" ? "active" : ""} onClick={() => open("home")}>⌂<span>首页</span></button>
+      <button className={view === "triage" ? "active" : ""} onClick={() => open("triage")}>✦<span>导诊</span></button>
+      <button className={view === "guide" ? "active" : ""} onClick={() => open("guide")}>⌁<span>地图</span></button>
+      <button className={view === "doctors" ? "active" : ""} onClick={() => open("doctors")}>医<span>医生</span></button>
+    </nav>
+  </main>;
 }
 
-function Triage({ step, setStep, symptom, setSymptom, selected, setSelected, onBack }: { step:number; setStep:(n:number)=>void; symptom:string; setSymptom:(s:string)=>void; selected:string; setSelected:(s:string)=>void; onBack:()=>void }) {
-  const [saveState, setSaveState] = useState<"idle"|"saving"|"saved">("idle");
+function HomePage({ catalog, open }: { catalog: Catalog; open: (view: View) => void }) {
+  return <>
+    <section className="kiosk-home">
+      <div className="hero-copy">
+        <div className="hospital-badge"><span>三甲</span><div><b>{catalog.hospital.name}</b><small>院方资料版 · 更新至 2026 年</small></div></div>
+        <span className="eyebrow">AI 智慧导诊服务</span>
+        <h1>您好，我是小角<br /><em>陪您清楚就医</em></h1>
+        <p>从症状分流到科室推荐，从楼层地图到就诊流程，信息均来自本次院方上传资料。</p>
+        <div className="hero-buttons">
+          <button className="primary jumbo" onClick={() => open("triage")}>开始智能导诊 <span>→</span></button>
+          <button className="secondary jumbo" onClick={() => open("guide")}>查看院内地图</button>
+        </div>
+        <div className="emergency-strip"><b>紧急情况</b><span>严重胸痛、呼吸困难、意识不清或大量出血，请立即拨打 120。</span><a href="tel:120">拨打 120</a></div>
+      </div>
+      <div className="home-services">
+        <div className="section-head compact"><div><span className="eyebrow">常用服务</span><h2>请选择需要的帮助</h2></div><small>支持触摸操作</small></div>
+        <div className="service-grid">{services.map((item) => <button key={item.id} className="service-card" onClick={() => open(item.id)}>
+          <span className={`service-icon ${item.tone}`}>{item.icon}</span><span><b>{item.title}</b><small>{item.sub}</small></span><i>→</i>
+        </button>)}</div>
+        <div className="source-note"><span>资料概览</span><b>{catalog.departments.length}</b> 个科室　<b>{catalog.doctors.length}</b> 位医生　<b>{catalog.maps.length}</b> 张楼层图</div>
+      </div>
+    </section>
+    <footer><span>未来仕角 · {catalog.hospital.shortName}</span><span>资料来源：院方 2026.7.21 上传包　|　导诊不替代医生诊断</span></footer>
+  </>;
+}
+
+function Triage({ onBack }: { onBack: () => void }) {
+  const [step, setStep] = useState(0);
+  const [symptom, setSymptom] = useState("");
+  const [selected, setSelected] = useState("");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [recommendation, setRecommendation] = useState<{ name: string; floor: string; zone: string; guidance: string } | null>(null);
   const [recommending, setRecommending] = useState(false);
+  const symptoms = ["头痛 / 头晕", "胸闷 / 心慌", "咳嗽 / 发热", "腹痛 / 腹泻", "关节 / 腰背痛", "皮肤不适", "儿童不适", "睡眠 / 情绪问题"];
+
   async function requestRecommendation() {
     setRecommending(true);
     try {
-      const response = await fetch("/api/v1/triage/recommendations", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ symptom }) });
+      const response = await fetch("/api/v1/triage/recommendations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ symptom }) });
       const payload = await response.json() as { data?: { urgency: string; guidance: string; recommendedDepartment: { name: string; floor: string; zone: string } | null } };
       if (payload.data?.urgency === "emergency") { setStep(3); return; }
       if (payload.data?.recommendedDepartment) setRecommendation({ ...payload.data.recommendedDepartment, guidance: payload.data.guidance });
@@ -172,69 +259,150 @@ function Triage({ step, setStep, symptom, setSymptom, selected, setSelected, onB
     } catch { setStep(2); }
     finally { setRecommending(false); }
   }
+
   async function saveRecord() {
     setSaveState("saving");
-    const response = await fetch("/api/triage-records", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({ symptom, safetyStatus:"non_urgent" }) });
+    const response = await fetch("/api/triage-records", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ symptom, safetyStatus: "non_urgent", recommendedDepartment: recommendation?.name }) });
     if (response.status === 401) { window.location.href = "/login?returnTo=%2F"; return; }
-    if (response.ok) setSaveState("saved"); else setSaveState("idle");
+    setSaveState(response.ok ? "saved" : "idle");
   }
-  const symptoms = ["头痛 / 头晕","胸闷 / 心慌","咳嗽 / 发热","腹痛 / 腹泻","关节 / 腰背痛","皮肤不适"];
+
   return <section className="flow-page">
     <button className="back" onClick={step ? () => setStep(step - 1) : onBack}>← 返回</button>
     <div className="flow-wrap">
-      <div className="progress"><i style={{width:`${(step+1)*33.3}%`}}/><span>症状描述</span><span>安全确认</span><span>科室建议</span></div>
-      {step === 0 && <div className="flow-card"><span className="large-icon">✦</span><h2>请告诉我哪里不舒服</h2><p>可以直接输入，也可以选择一个常见症状开始。</p><textarea value={symptom} onChange={e=>setSymptom(e.target.value)} placeholder="例如：最近两天头晕，站起来时更明显……"/><div className="chips">{symptoms.map(s=><button className={selected===s?"selected":""} onClick={()=>{setSelected(s);setSymptom(s)}} key={s}>{s}</button>)}</div><button className="primary wide" disabled={!symptom.trim()} onClick={()=>setStep(1)}>继续 <span>→</span></button></div>}
-      {step === 1 && <div className="flow-card alert-card"><span className="large-icon warn">!</span><h2>先确认是否需要紧急帮助</h2><p>以下情况可能需要立即处理，请如实选择。</p><div className="warning-list"><b>是否出现以下任一情况？</b><span>严重胸痛或呼吸困难</span><span>意识不清、突然昏倒或抽搐</span><span>突发口角歪斜、言语不清或一侧无力</span><span>无法止住的大量出血</span></div><div className="choice-row"><button className="danger-choice" onClick={()=>setStep(3)}>有，需要帮助</button><button className="safe-choice" disabled={recommending} onClick={()=>void requestRecommendation()}>{recommending?"正在匹配医院科室…":"没有，继续导诊"}</button></div></div>}
-      {step === 2 && <div className="flow-card result-card"><span className="result-tag">导诊建议 · 医院数据已联动</span><h2>建议优先前往 <em>{recommendation?.name || (symptom.includes("头")?"神经内科":symptom.includes("胸")?"心血管内科":symptom.includes("关节")?"骨科":"全科医学科")}</em></h2><p>{recommendation?.guidance || `根据您描述的“${symptom}”，该科室与当前症状方向较匹配。`}最终请以现场分诊及医生判断为准。</p><div className="result-info"><span><small>位置</small><b>{recommendation ? `${recommendation.floor}${recommendation.zone ? ` · ${recommendation.zone}` : ""}` : "门诊楼 3F · A 区"}</b></span><span><small>数据来源</small><b>医院主数据接口</b></span><span><small>建议准备</small><b>既往病历、检查报告</b></span></div><div className="choice-row"><button className="secondary" onClick={()=>setStep(0)}>重新导诊</button><button className="primary" onClick={saveRecord} disabled={saveState!=="idle"}>{saveState==="saved"?"已保存到个人中心 ✓":saveState==="saving"?"正在保存…":"登录并保存记录"}</button></div><p className="safe-note center">这不是诊断或处方；症状加重或出现危险信号时，请立即就医。</p></div>}
-      {step === 3 && <div className="flow-card emergency"><span className="large-icon warn">!</span><h2>请立即寻求紧急医疗帮助</h2><p>不要继续在线导诊。请立即拨打 120，或让身边的人陪同前往最近的急诊科。</p><a href="tel:120" className="primary wide">拨打 120</a><button className="secondary wide" onClick={()=>setStep(1)}>返回重新选择</button></div>}
+      <div className="progress"><i style={{ width: `${Math.min(step + 1, 3) * 33.3}%` }} /><span>症状描述</span><span>安全确认</span><span>科室建议</span></div>
+      {step === 0 && <div className="flow-card"><span className="large-icon">✦</span><h2>请告诉我哪里不舒服</h2><p>不要填写姓名、身份证号或完整病历。可以输入简短症状，也可以点击常见症状。</p><textarea value={symptom} onChange={(event) => setSymptom(event.target.value)} maxLength={500} placeholder="例如：最近两天头晕，站起来时更明显……" /><div className="chips">{symptoms.map((item) => <button className={selected === item ? "selected" : ""} onClick={() => { setSelected(item); setSymptom(item); }} key={item}>{item}</button>)}</div><button className="primary wide" disabled={!symptom.trim()} onClick={() => setStep(1)}>继续安全确认 →</button></div>}
+      {step === 1 && <div className="flow-card alert-card"><span className="large-icon warn">!</span><h2>先确认是否需要紧急帮助</h2><p>以下情况不能继续普通在线导诊。</p><div className="warning-list"><b>是否出现以下任一情况？</b><span>严重胸痛或呼吸困难</span><span>意识不清、突然昏倒或抽搐</span><span>突发口角歪斜、言语不清或一侧无力</span><span>无法止住的大量出血</span></div><div className="choice-row"><button className="danger-choice" onClick={() => setStep(3)}>有，需要紧急帮助</button><button className="safe-choice" disabled={recommending} onClick={() => void requestRecommendation()}>{recommending ? "正在匹配院内科室…" : "没有，继续导诊"}</button></div></div>}
+      {step === 2 && <div className="flow-card result-card"><span className="result-tag">导诊建议 · 院方科室目录</span><h2>建议优先前往 <em>{recommendation?.name || "现场导诊台"}</em></h2><p>{recommendation?.guidance || "暂未匹配到明确科室，建议先咨询门诊楼 1F 导医服务总台。"} 最终请以现场分诊及医生判断为准。</p><div className="result-info"><span><small>院内位置</small><b>{recommendation ? `${recommendation.floor}${recommendation.zone ? ` · ${recommendation.zone}` : ""}` : "门诊楼 1F"}</b></span><span><small>数据来源</small><b>医院主数据与院方楼层图</b></span><span><small>建议准备</small><b>既往病历、检查报告</b></span></div><div className="choice-row"><button className="secondary" onClick={() => setStep(0)}>重新导诊</button><button className="primary" onClick={() => void saveRecord()} disabled={saveState !== "idle"}>{saveState === "saved" ? "已保存到个人中心 ✓" : saveState === "saving" ? "正在保存…" : "登录并保存记录"}</button></div><p className="safe-note center">这不是诊断或处方；症状加重或出现危险信号时，请立即就医。</p></div>}
+      {step === 3 && <div className="flow-card emergency"><span className="large-icon warn">!</span><h2>请立即寻求紧急医疗帮助</h2><p>不要继续在线导诊。请立即拨打 120，或让身边的人陪同前往急诊科。院内急救电话：028-83611120。</p><a href="tel:120" className="primary wide">立即拨打 120</a><button className="secondary wide" onClick={() => setStep(1)}>返回重新确认</button></div>}
     </div>
-  </section>
+  </section>;
 }
 
-function ModulePage({ view, catalog, onBack, onOpen }: { view:View; catalog:Catalog; onBack:()=>void; onOpen:(v:View)=>void }) {
-  const titles: Record<string,[string,string]> = {guide:["院内导航","查找目的地，获取清晰路线"],departments:["科室介绍","了解特色科室与位置"],doctors:["医生介绍","按科室查找合适的医生"],hospital:["就医服务","医院介绍与常用流程"],education:["健康宣教","可信、易懂的健康知识"],nearby:["周边服务","就医生活配套一站查找"]};
-  const [title, sub] = titles[view] || titles.hospital;
-  return <section className="module-page"><div className="module-head"><button className="back" onClick={onBack}>← 返回首页</button><span className="eyebrow">未来仕角智慧导医</span><h1>{title}</h1><p>{sub}</p></div>
-    {view === "guide" && <div className="map-layout"><div className="place-list"><label>您要去哪里？<input placeholder="搜索科室、窗口、设施" /></label>{catalog.locations.slice(0,5).map((item,i)=><button className={i===1?"active":""} key={item.id}><span>{["◎","🫀","⌬","✚","◇"][i] || "⌁"}</span><b>{item.name}<small>{item.building} {item.floor}{item.zone?` · ${item.zone}`:""}</small></b><i>→</i></button>)}</div><div className="map"><div className="map-label a">当前位置</div><div className="route"><i/><i/><i/><i/><i/></div><div className="map-label b">心血管内科</div><div className="building b1">门诊大厅</div><div className="building b2">中庭</div><div className="building b3">A 区诊室</div><div className="route-info"><b>预计 4 分钟 · 约 260 米</b><span>直行至中庭 → 乘 2 号电梯到 3F → 左转进入 A 区</span></div></div></div>}
-    {view === "departments" && <div className="content-grid">{catalog.departments.map(d=><article className="info-card" key={d.name}><span className="round-icon">{d.icon}</span><div><h3>{d.name}</h3><p>{d.desc}</p><small>⌁ {d.floor}</small></div><button onClick={()=>onOpen("guide")}>查看位置 →</button></article>)}</div>}
-    {view === "doctors" && <div className="doctor-grid">{catalog.doctors.map(d=><article className="doctor-card" key={d.name}><div className="avatar" style={{background:d.color}}>{d.name.slice(0,1)}</div><span className="available">● 排班已同步</span><h3>{d.name}</h3><p>{d.rank} · {d.dept}</p><dl><dt>擅长</dt><dd>{d.skill}</dd><dt>出诊</dt><dd>{d.time}</dd></dl><button className="primary">查看排班</button></article>)}</div>}
-    {view === "hospital" && <div className="hospital-layout"><article className="hospital-intro"><span className="eyebrow">医院概况</span><h2>{catalog.hospital.name}</h2><p>地址：{catalog.hospital.address}。医院名称、科室、医生与位置均由后端主数据接口统一提供。</p><div><span><b>{catalog.departments.length}</b>已同步科室</span><span><b>{catalog.doctors.length}</b>已同步医生</span><span><b>24h</b>急诊服务</span></div></article><div className="process-list">{["初次就诊办卡","预约挂号与取号","门诊缴费","办理入院","报告查询"].map((x,i)=><button key={x}><span>0{i+1}</span><b>{x}<small>{i===0?"身份证 → 建档 → 领取就诊码":"查看分步办理说明"}</small></b><i>→</i></button>)}</div><article className="qr-card"><div className="fake-qr">▦</div><div><h3>扫码进入医院服务号</h3><p>预约挂号、门诊缴费、候诊提醒、报告查询</p><small>演示二维码 · 不产生真实交易</small></div></article></div>}
-    {view === "education" && <div className="article-grid">{catalog.knowledgeArticles.map((a,i)=><article key={a.id}><div className={`article-cover c${i%4+1}`}><span>{["☀","♡","＋","☆"][i%4]}</span></div><small>{a.category}</small><h3>{a.title}</h3><p>{a.summary}</p><button>阅读全文 →</button></article>)}</div>}
-    {view === "nearby" && <div className="content-grid">{["便民餐饮","卫生间","停车场","地铁公交","便利店","银行 ATM"].map((x,i)=><article className="info-card" key={x}><span className="round-icon">{["🍜","◇","P","🚇","▣","¥"][i]}</span><div><h3>{x}</h3><p>展示医院周边 1 公里内的便民设施</p><small>最近约 {120+i*90} 米</small></div><button>查看地图 →</button></article>)}</div>}
-  </section>
+function ModulePage({ view, catalog, onBack, onOpen }: { view: Exclude<View, "home" | "triage" | "admin">; catalog: Catalog; onBack: () => void; onOpen: (view: View) => void }) {
+  const titles: Record<string, [string, string]> = {
+    guide: ["院内地图", "使用院方原始楼层图查找科室与服务点"],
+    departments: ["科室介绍", "按名称、疾病方向和位置搜索"],
+    doctors: ["医生介绍", "院方 2026 年 5 月医生与出诊资料"],
+    hospital: ["就医服务", "医院概况与院方流程"],
+    education: ["政策宣教", "资料标注版本日期，避免旧政策误导"],
+  };
+  const [title, sub] = titles[view];
+  return <section className="module-page">
+    <div className="module-head"><button className="back" onClick={onBack}>← 返回首页</button><span className="eyebrow">{catalog.hospital.shortName}</span><h1>{title}</h1><p>{sub}</p></div>
+    {view === "guide" && <GuideModule catalog={catalog} />}
+    {view === "departments" && <DepartmentsModule catalog={catalog} onOpen={onOpen} />}
+    {view === "doctors" && <DoctorsModule catalog={catalog} />}
+    {view === "hospital" && <HospitalModule catalog={catalog} />}
+    {view === "education" && <EducationModule catalog={catalog} />}
+  </section>;
 }
 
-function Admin({ catalog, refreshCatalog, onExit }:{catalog:Catalog; refreshCatalog:()=>Promise<void>; onExit:()=>void}) {
-  const [section,setSection]=useState("总览");
-  const [overview,setOverview]=useState<AdminOverview|null>(null);
-  useEffect(()=>{ fetch("/api/v1/admin/overview?demo=1").then(response=>response.ok?response.json():null).then((payload:{data?:AdminOverview}|null)=>{if(payload?.data)setOverview(payload.data)}).catch(()=>{}); },[]);
-  const nav=["总览","服务数据","问答记录","知识库管理","医院内容","设备管理","权限与日志"];
-  return <main className="admin-shell"><aside><div className="admin-brand"><span>角</span><b>未来仕角<small>运营管理平台 · 接口联动版</small></b></div><nav>{nav.map((n,i)=><button className={section===n?"active":""} onClick={()=>setSection(n)} key={n}><i>{["⌂","◫","◌","◇","＋","▣","⌾"][i]}</i>{n}</button>)}</nav><button className="exit" onClick={onExit}>← 返回演示前台</button></aside><section className="admin-main"><header><div><b>{section}</b><span>{new Date().toLocaleDateString("zh-CN")} · 后端数据已联动</span></div><div><button>接口 {overview?.integration.status==="success"?"正常":"待接入"}</button><span className="admin-user">管</span><b>管理员</b></div></header>{section==="总览"?<Dashboard overview={overview} setSection={setSection}/>:<AdminTable catalog={catalog} refreshCatalog={refreshCatalog} section={section}/>}</section></main>
-}
+function GuideModule({ catalog }: { catalog: Catalog }) {
+  const [mapId, setMapId] = useState(catalog.maps[0]?.id || "");
+  const [query, setQuery] = useState("");
+  const selected = catalog.maps.find((item) => item.id === mapId) || catalog.maps[0];
+  const locations = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return catalog.locations.filter((item) => !term || `${item.name}${item.building}${item.floor}${item.zone}${item.description}`.toLowerCase().includes(term)).slice(0, 30);
+  }, [catalog.locations, query]);
 
-function Dashboard({overview,setSection}:{overview:AdminOverview|null;setSection:(s:string)=>void}) {
-  const today=overview?.today;
-  const trend=overview?.trend.length?overview.trend.map(item=>Math.max(18,Math.round(item.serviceCount/14))):[42,58,51,73,66,82,70];
-  const labels=overview?.trend.length?overview.trend.map(item=>item.metricDate.slice(5)): ["一","二","三","四","五","六","日"];
-  const kpis=[["今日服务人次",String(today?.serviceCount??1286),"实时"],["完成导诊",String(today?.triageCount??438),"实时"],["问答解决率",`${today?.resolvedRate??93}%`,"实时"],["转人工服务",String(today?.transferCount??36),"实时"]];
-  return <div className="dashboard"><div className="dash-head"><div><span className="eyebrow">今日运营</span><h1>服务运行稳定</h1><p>{overview?`${overview.masterData.departments} 个科室、${overview.masterData.doctors} 位医生、${overview.masterData.publishedArticles} 篇宣教内容已从后端同步。`:"正在读取后端运营数据…"}</p></div><button className="primary" onClick={()=>setSection("知识库管理")}>管理知识内容</button></div><div className="kpis">{kpis.map(k=><article key={k[0]}><span>{k[0]}</span><b>{k[1]}</b><small>{k[2]}数据</small></article>)}</div><div className="dash-grid"><article className="chart-card"><div className="card-title"><b>近 7 日服务趋势</b><span>后端统计</span></div><div className="bars">{trend.map((h,i)=><i key={i} style={{height:`${Math.min(h,95)}%`}}><span>{labels[i]}</span></i>)}</div></article><article className="card-panel"><div className="card-title"><b>服务类型分布</b></div><div className="donut"><span><b>{today?.serviceCount??1286}</b><small>总服务</small></span></div><ul><li><i className="d1"/>智能导诊 <b>{today?Math.round(today.triageCount/today.serviceCount*100):34}%</b></li><li><i className="d2"/>院内导航 <b>{today?Math.round(today.navigationCount/today.serviceCount*100):28}%</b></li><li><i className="d3"/>流程查询 <b>22%</b></li><li><i className="d4"/>其他服务 <b>16%</b></li></ul></article><article className="card-panel full"><div className="card-title"><b>热门问题 Top 5</b><button onClick={()=>setSection("问答记录")}>查看全部</button></div>{["心血管内科怎么走？","第一次就诊怎么办卡？","头晕应该挂什么科？","检查报告在哪里查？","停车场从哪个门进？"].map((q,i)=><div className="hot-row" key={q}><span>0{i+1}</span><b>{q}</b><small>{[186,142,128,96,83][i]} 次</small><i>{["98%","96%","91%","95%","89%"] [i]} 解决</i></div>)}</article></div></div>
-}
-
-function AdminTable({section,catalog,refreshCatalog}:{section:string;catalog:Catalog;refreshCatalog:()=>Promise<void>}) {
-  const fallback=["胸闷伴心慌应该挂什么科？","门诊办卡需要哪些证件？","儿童发热去哪个科室？","住院部 2 号楼怎么走？","核磁共振检查如何预约？"].map((title,index)=>({id:`demo-${index}`,title,category:["预检分诊","就医流程","预检分诊","院内导航","检查预约"][index],status:"已发布",updated:"演示数据",entity:""}));
-  const rows=section==="知识库管理"?catalog.knowledgeArticles.map(item=>({id:item.id,title:item.title,category:item.category,status:"已发布",updated:item.updatedAt?.slice(0,10)||"已同步",entity:"knowledge"})):section==="医院内容"?[...catalog.departments.map((item,index)=>({id:`department-${index}`,realId:item.name,title:item.name,category:"科室",status:"已发布",updated:item.floor,entity:"departments"})),...catalog.doctors.map((item,index)=>({id:`doctor-${index}`,realId:item.name,title:item.name,category:item.dept,status:"已发布",updated:item.time,entity:"doctors"}))]:fallback;
-  async function edit(row:{id:string;realId?:string;title:string;entity:string}) {
-    if(!row.entity)return;
-    const next=window.prompt("修改名称/标题",row.title)?.trim();
-    if(!next||next===row.title)return;
-    const sourceResponse=await fetch("/api/v1/catalog");
-    const source=sourceResponse.ok?await sourceResponse.json() as {data:{departments:Array<{id:string;name:string}>;doctors:Array<{id:string;name:string}>}}:null;
-    const realId=row.entity==="knowledge"?row.id:row.entity==="departments"?source?.data.departments.find(item=>item.name===row.realId)?.id:source?.data.doctors.find(item=>item.name===row.realId)?.id;
-    if(!realId)return;
-    const field=row.entity==="knowledge"?"title":"name";
-    const response=await fetch(`/api/v1/admin/content/${row.entity}/${realId}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({[field]:next})});
-    if(response.status===401||response.status===403){window.location.assign("/login?returnTo=%2F");return;}
-    if(response.ok)await refreshCatalog();
+  function selectLocation(location: Location) {
+    const match = catalog.maps.find((item) => item.building === location.building && item.floor === location.floor);
+    if (match) setMapId(match.id);
   }
-  return <div className="dashboard"><div className="dash-head"><div><span className="eyebrow">运营模块</span><h1>{section}</h1><p>{section==="知识库管理"||section==="医院内容"?"内容来自同一后端；管理员修改后患者前台同步更新。":"汇总展示服务记录与接口数据。"}</p></div><button className="primary">新增需管理员</button></div><article className="data-table"><div className="table-tools"><input placeholder="搜索名称、问题或关键词"/><button>筛选</button><button>导出</button></div><div className="table-head"><span>内容 / 记录</span><span>分类</span><span>状态</span><span>更新时间</span><span>操作</span></div>{rows.map((row)=><div className="table-row" key={row.id}><span><b>{row.title}</b><small>ID · {row.id}</small></span><span>{row.category}</span><span><i className="published"/>{row.status}</span><span>{row.updated}</span><button onClick={()=>void edit(row)}>{row.entity?"编辑":"查看"}</button></div>)}</article></div>
+
+  return <div className="guide-shell">
+    <aside className="map-sidebar"><label>搜索科室或服务点<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="如：心血管内科、采血室" /></label><div className="location-results">{locations.length ? locations.map((item) => <button key={item.id} onClick={() => selectLocation(item)}><span>⌁</span><b>{item.name}<small>{item.building} {item.floor}{item.zone ? ` · ${item.zone}` : ""}</small></b><i>→</i></button>) : <p className="empty-small">没有匹配结果，请咨询 1F 导医服务总台。</p>}</div></aside>
+    <section className="floor-view"><div className="floor-tabs">{catalog.maps.map((item) => <button className={item.id === selected?.id ? "active" : ""} onClick={() => setMapId(item.id)} key={item.id}>{item.name}</button>)}</div>{selected && <><div className="map-image"><img src={selected.image} alt={`${selected.name}院方楼层图`} width="1732" height="1080" loading={selected.id === "outpatient-1f" ? "eager" : "lazy"} /></div><div className="map-caption"><div><b>{selected.name}</b><span>{selected.summary}</span></div><small>院方原始楼层图 · 位置调整时以现场标识为准</small></div></>}</section>
+  </div>;
+}
+
+function DepartmentsModule({ catalog, onOpen }: { catalog: Catalog; onOpen: (view: View) => void }) {
+  const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(18);
+  const [selected, setSelected] = useState<Department | null>(null);
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return catalog.departments.filter((item) => !term || `${item.name}${item.desc}${item.specialty}${item.floor}`.toLowerCase().includes(term));
+  }, [catalog.departments, query]);
+  return <>
+    <div className="catalog-toolbar"><input value={query} onChange={(event) => { setQuery(event.target.value); setLimit(18); }} placeholder="搜索科室、疾病方向或特色技术" /><span>共 {filtered.length} 个结果</span></div>
+    <div className="content-grid">{filtered.slice(0, limit).map((item) => <article className="info-card" key={item.id}><span className="round-icon">{item.icon}</span><div><h3>{item.name}</h3><p>{item.desc}</p><small>⌁ {item.floor}</small></div><div className="card-actions"><button onClick={() => setSelected(item)}>查看介绍</button><button onClick={() => onOpen("guide")}>查看地图</button></div></article>)}</div>
+    {limit < filtered.length && <button className="load-more" onClick={() => setLimit(limit + 18)}>加载更多科室</button>}
+    {selected && <Modal title={selected.name} onClose={() => setSelected(null)}><p className="detail-location">⌁ {selected.floor}</p><h4>科室介绍</h4><p>{selected.desc}</p><h4>特色方向</h4><p>{selected.specialty || "具体诊疗范围以院方当日门诊安排为准。"}</p></Modal>}
+  </>;
+}
+
+function DoctorsModule({ catalog }: { catalog: Catalog }) {
+  const [query, setQuery] = useState("");
+  const [department, setDepartment] = useState("全部科室");
+  const [limit, setLimit] = useState(18);
+  const [selected, setSelected] = useState<Doctor | null>(null);
+  const departmentOptions = useMemo(() => ["全部科室", ...Array.from(new Set(catalog.doctors.map((item) => item.dept))).sort((a, b) => a.localeCompare(b, "zh-CN"))], [catalog.doctors]);
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return catalog.doctors.filter((item) => (department === "全部科室" || item.dept === department) && (!term || `${item.name}${item.dept}${item.rank}${item.skill}${item.profile}`.toLowerCase().includes(term)));
+  }, [catalog.doctors, department, query]);
+  return <>
+    <div className="catalog-toolbar doctor-toolbar"><input value={query} onChange={(event) => { setQuery(event.target.value); setLimit(18); }} placeholder="搜索医生姓名、科室或擅长方向" /><select value={department} onChange={(event) => { setDepartment(event.target.value); setLimit(18); }}>{departmentOptions.map((item) => <option key={item}>{item}</option>)}</select><span>{filtered.length} 位医生</span></div>
+    <div className="doctor-grid">{filtered.slice(0, limit).map((item) => <article className="doctor-card" key={item.id}><div className="avatar" style={{ background: item.color }}>{item.name.slice(0, 1)}</div><span className="source-status">院方资料</span><h3>{item.name}</h3><p>{item.rank} · {item.dept}</p><dl><dt>擅长</dt><dd>{item.skill || "详见医生介绍"}</dd><dt>资料排班</dt><dd>{item.time}</dd></dl><button className="primary" onClick={() => setSelected(item)}>查看医生详情</button></article>)}</div>
+    {limit < filtered.length && <button className="load-more" onClick={() => setLimit(limit + 18)}>加载更多医生</button>}
+    {selected && <Modal title={selected.name} onClose={() => setSelected(null)}><div className="doctor-detail-head"><div className="avatar" style={{ background: selected.color }}>{selected.name.slice(0, 1)}</div><div><b>{selected.rank}</b><span>{selected.dept}</span></div></div><h4>擅长方向</h4><p>{selected.skill}</p><h4>医生介绍</h4><p>{selected.profile}</p><div className="schedule-box"><small>资料中的出诊安排</small><b>{selected.time}</b><span>实际号源与停诊信息以医院当日排班系统为准。</span></div><p className="source-line">资料来源：{selected.source}</p></Modal>}
+  </>;
+}
+
+function HospitalModule({ catalog }: { catalog: Catalog }) {
+  const [processId, setProcessId] = useState(catalog.processes[0]?.id || "");
+  const process = catalog.processes.find((item) => item.id === processId) || catalog.processes[0];
+  const stats = catalog.profile.stats;
+  return <div className="hospital-page-grid">
+    <article className="hospital-intro"><span className="eyebrow">医院概况 · 资料日期 2026-07-03</span><h2>{catalog.hospital.name}</h2><p>{catalog.profile.description}</p><p className="hospital-address">⌁ {catalog.hospital.address}</p><div className="hospital-stats"><span><b>{stats.beds}</b>编制床位</span><span><b>{stats.employees}</b>名职工</span><span><b>{stats.specialtyCenters}</b>个专病中心</span><span><b>{stats.buildingArea}</b>建筑面积</span></div></article>
+    <section className="process-panel"><div className="process-nav">{catalog.processes.map((item) => <button className={item.id === process?.id ? "active" : ""} onClick={() => setProcessId(item.id)} key={item.id}>{item.title}<span>→</span></button>)}</div>{process && <article className="process-detail"><span className="eyebrow">办理步骤</span><h3>{process.title}</h3><ol>{process.steps.map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span><b>{step}</b></li>)}</ol><small>{process.source} · 流程调整时以医院现场公告为准</small></article>}</section>
+    <article className="contact-card"><div><small>门诊咨询</small><a href={`tel:${catalog.profile.servicePhone}`}>{catalog.profile.servicePhone}</a></div><div><small>院内急救</small><a href="tel:02883611120">028-83611120</a></div><div><small>社会急救</small><a href="tel:120">120</a></div></article>
+  </div>;
+}
+
+function EducationModule({ catalog }: { catalog: Catalog }) {
+  const [selected, setSelected] = useState<Article | null>(null);
+  return <><div className="policy-warning"><b>医保政策版本提示</b><span>院方上传的医保政策材料形成于 2023 年 2 月，可能已调整。系统暂不公开旧报销比例，正式上线前须由医院医保办复核。</span></div><div className="article-grid">{catalog.knowledgeArticles.map((item, index) => <article key={item.id}><div className={`article-cover c${index % 4 + 1}`}><span>{["流", "挂", "急", "护"][index % 4]}</span></div><small>{item.category}</small><h3>{item.title}</h3><p>{item.summary}</p><button onClick={() => setSelected(item)}>查看完整步骤 →</button></article>)}</div>{selected && <Modal title={selected.title} onClose={() => setSelected(null)}><p className="article-content">{selected.content}</p><p className="source-line">资料来源：院方上传流程文件；实际办理以现场公告为准。</p></Modal>}</>;
+}
+
+function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [onClose]);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><article className="detail-modal" role="dialog" aria-modal="true" aria-label={title}><header><h3>{title}</h3><button onClick={onClose} aria-label="关闭">×</button></header><div>{children}</div></article></div>;
+}
+
+function Admin({ catalog, refreshCatalog, onExit }: { catalog: Catalog; refreshCatalog: () => Promise<void>; onExit: () => void }) {
+  const [section, setSection] = useState("总览");
+  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  useEffect(() => { fetch("/api/v1/admin/overview?demo=1").then((response) => response.ok ? response.json() : null).then((payload: { data?: AdminOverview } | null) => { if (payload?.data) setOverview(payload.data); }).catch(() => {}); }, []);
+  const nav = ["总览", "医院内容", "知识库管理", "接口联动", "权限与日志"];
+  return <main className="admin-shell"><aside><div className="admin-brand"><span>角</span><b>未来仕角<small>运营管理平台</small></b></div><nav>{nav.map((item, index) => <button className={section === item ? "active" : ""} onClick={() => setSection(item)} key={item}><i>{["⌂", "＋", "◇", "↔", "⌾"][index]}</i>{item}</button>)}</nav><button className="exit" onClick={onExit}>← 返回患者端</button></aside><section className="admin-main"><header><div><b>{section}</b><span>{new Date().toLocaleDateString("zh-CN")} · 医院资料版</span></div><div><button>接口 {overview?.integration.status === "success" ? "正常" : "待医院接入"}</button><span className="admin-user">管</span><b>管理员</b></div></header>{section === "总览" ? <Dashboard overview={overview} catalog={catalog} setSection={setSection} /> : <AdminTable catalog={catalog} refreshCatalog={refreshCatalog} section={section} />}</section></main>;
+}
+
+function Dashboard({ overview, catalog, setSection }: { overview: AdminOverview | null; catalog: Catalog; setSection: (value: string) => void }) {
+  const today = overview?.today;
+  const kpis = [["已上线科室", String(overview?.masterData.departments ?? catalog.departments.length), "医院目录"], ["医生资料", String(overview?.masterData.doctors ?? catalog.doctors.length), "院方资料"], ["楼层地图", String(catalog.maps.length), "院方原图"], ["今日真实服务量", String(today?.serviceCount ?? 0), today ? "统计接口" : "尚未接入"]];
+  return <div className="dashboard"><div className="dash-head"><div><span className="eyebrow">内容运行状态</span><h1>医院资料已完成结构化</h1><p>当前展示真实院方目录；HIS 号源、预约、叫号与运营统计仍需医院接口凭据。</p></div><button className="primary" onClick={() => setSection("医院内容")}>管理医院内容</button></div><div className="kpis">{kpis.map((item) => <article key={item[0]}><span>{item[0]}</span><b>{item[1]}</b><small>{item[2]}</small></article>)}</div><div className="dash-grid"><article className="card-panel full"><div className="card-title"><b>上线检查</b><span>不伪造医院业务结果</span></div><div className="check-grid"><div className="ok">✓<b>医院、科室、医生、地图</b><small>已从本次资料导入</small></div><div className="ok">✓<b>导诊与急症安全分流</b><small>已联动医院科室编码</small></div><div className="wait">…<b>HIS / 预约 / 叫号</b><small>等待医院测试地址与凭据</small></div><div className="wait">…<b>实时排班与运营统计</b><small>等待接口正式同步</small></div></div></article></div></div>;
+}
+
+function AdminTable({ section, catalog, refreshCatalog }: { section: string; catalog: Catalog; refreshCatalog: () => Promise<void> }) {
+  const [query, setQuery] = useState("");
+  const rows = section === "知识库管理" ? catalog.knowledgeArticles.map((item) => ({ id: item.id, realId: item.id, title: item.title, category: item.category, status: "已发布", updated: item.updatedAt?.slice(0, 10) || "院方资料", entity: "knowledge" })) : section === "医院内容" ? [...catalog.departments.map((item) => ({ id: item.id, realId: item.id, title: item.name, category: "科室", status: "已发布", updated: item.floor, entity: "departments" })), ...catalog.doctors.map((item) => ({ id: item.id, realId: item.id, title: item.name, category: item.dept, status: "已发布", updated: item.time, entity: "doctors" }))] : [{ id: "integration", realId: "", title: "医院接口适配器", category: "HMAC + 幂等", status: "待医院接入", updated: "需测试地址和凭据", entity: "" }];
+  const filtered = rows.filter((item) => `${item.title}${item.category}${item.updated}`.toLowerCase().includes(query.toLowerCase()));
+  async function edit(row: typeof rows[number]) {
+    if (!row.entity) return;
+    const next = window.prompt("修改名称/标题", row.title)?.trim();
+    if (!next || next === row.title) return;
+    const field = row.entity === "knowledge" ? "title" : "name";
+    const response = await fetch(`/api/v1/admin/content/${row.entity}/${row.realId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ [field]: next }) });
+    if (response.status === 401 || response.status === 403) { window.location.assign("/login?returnTo=%2F"); return; }
+    if (response.ok) await refreshCatalog();
+  }
+  return <div className="dashboard"><div className="dash-head"><div><span className="eyebrow">运营模块</span><h1>{section}</h1><p>{section === "医院内容" || section === "知识库管理" ? "管理员修改后，患者端通过同一目录接口同步更新。" : "接口状态仅展示真实连接结果。"}</p></div><button className="primary">新增需管理员登录</button></div><article className="data-table"><div className="table-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索名称、科室或关键词" /><button>筛选</button></div><div className="table-head"><span>内容 / 记录</span><span>分类</span><span>状态</span><span>资料 / 排班</span><span>操作</span></div>{filtered.slice(0, 100).map((row) => <div className="table-row" key={row.id}><span><b>{row.title}</b><small>ID · {row.id}</small></span><span>{row.category}</span><span><i className="published" />{row.status}</span><span>{row.updated}</span><button onClick={() => void edit(row)}>{row.entity ? "编辑" : "查看"}</button></div>)}</article></div>;
 }

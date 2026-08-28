@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -21,10 +22,12 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(0xFFFBFCF9);
-        getWindow().setNavigationBarColor(0xFFFBFCF9);
+        enterKioskDisplayMode();
         try {
-            FutureShijiaoConfig config = new FutureShijiaoConfig.Builder().build();
+            FutureShijiaoConfig config = new FutureShijiaoConfig.Builder()
+                .offlineOnly(true)
+                .openExternalLinks(false)
+                .build();
             guideView = new GuideWebView(this, config);
             setContentView(guideView);
             if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -49,7 +52,13 @@ public final class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        enterKioskDisplayMode();
         if (guideView != null) guideView.onHostResume();
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) enterKioskDisplayMode();
     }
 
     @Override protected void onDestroy() {
@@ -101,6 +110,34 @@ public final class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void enterKioskDisplayMode() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            KioskApi30.enter(getWindow());
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN
+            );
+        }
+    }
+
+    @android.annotation.TargetApi(30)
+    private static final class KioskApi30 {
+        private static void enter(android.view.Window window) {
+            window.setDecorFitsSystemWindows(false);
+            android.view.WindowInsetsController controller = window.getInsetsController();
+            if (controller == null) return;
+            controller.hide(android.view.WindowInsets.Type.statusBars() | android.view.WindowInsets.Type.navigationBars());
+            controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        }
     }
 
     private void handleBack() {

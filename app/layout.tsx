@@ -1,21 +1,10 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./account.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: "未来仕角｜智能导诊服务",
-  description: "面向患者的智能导诊、院内导航与就医服务演示平台。",
+  description: "成都市青白江区人民医院智能导诊、院内导航与就医服务平台。",
   openGraph: {
     title: "未来仕角｜安心就医，一路相伴",
     description: "智能导诊、院内导航与就医服务演示平台。",
@@ -33,6 +22,14 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f4f8f7",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,11 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
