@@ -10,8 +10,9 @@
 - 最低 Android 5.0（API 21）。
 - 目标 Android 16（API 36）。
 - 支持手机、平板、机器人横屏/竖屏和系统字体缩放。
-- 需要设备安装并启用 Android System WebView，且能访问部署域名。
-- WebView 缺失、初始化失败、渲染进程退出、断网、服务端 5xx 和 SSL 校验失败时显示原生恢复页，不让异常直接终止应用。
+- 联网时读取在线前后端；断网时自动加载 APK 内置离线演示页。
+- WebView 缺失、初始化失败或渲染进程退出时显示原生恢复页，不让异常直接终止应用。
+- RK3576 等 Rockchip 设备自动使用软件渲染，规避部分定制 GPU/WebView 的启动崩溃。
 
 ## AAR 集成
 
@@ -44,7 +45,7 @@ FutureShijiaoSdk.open(this);
 gradle :guide-sdk:assembleRelease :demo-app:assembleDebug
 ```
 
-演示 APK 使用 Android 调试证书签名，可直接安装测试；正式上架前应改用企业自有签名证书生成 release APK/AAB。
+RK3576 设备安装说明见 [`INSTALL-RK3576.md`](INSTALL-RK3576.md)。测试 APK 使用与上一演示包相同的测试证书，可覆盖安装；正式上架前应改用企业自有签名证书生成 release APK/AAB。
 
 设备仍有异常时可用以下命令采集日志（不包含网页密码）：
 

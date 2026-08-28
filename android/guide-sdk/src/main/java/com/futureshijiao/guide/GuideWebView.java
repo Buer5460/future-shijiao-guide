@@ -27,6 +27,10 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
 public final class GuideWebView extends FrameLayout {
     private static final String TAG = "FutureShijiao";
 
@@ -37,6 +41,7 @@ public final class GuideWebView extends FrameLayout {
     private final TextView errorMessage;
     private final FutureShijiaoConfig config;
     private boolean destroyed;
+    private boolean offlineFallbackLoaded;
 
     public GuideWebView(Context context, FutureShijiaoConfig config) {
         super(context);
@@ -89,11 +94,13 @@ public final class GuideWebView extends FrameLayout {
     private void createWebViewAndLoad() {
         if (destroyed) return;
         disposeWebView();
+        offlineFallbackLoaded = false;
         errorPanel.setVisibility(GONE);
         progress.setVisibility(VISIBLE);
         try {
             WebView next = new WebView(getContext());
             next.setBackgroundColor(0xFFFBFCF9);
+            if (isRockchipDevice()) next.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             WebSettings settings = next.getSettings();
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
@@ -136,6 +143,33 @@ public final class GuideWebView extends FrameLayout {
         progress.setVisibility(GONE);
         errorPanel.setVisibility(VISIBLE);
         errorPanel.bringToFront();
+    }
+
+    private void loadOfflineFallback(String reason) {
+        if (destroyed || webView == null) return;
+        if (offlineFallbackLoaded) return;
+        Log.w(TAG, "Loading offline demo: " + reason);
+        offlineFallbackLoaded = true;
+        try {
+            StringBuilder html = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                getContext().getAssets().open("future_shijiao_offline.html"),
+                StandardCharsets.UTF_8
+            ))) {
+                String line;
+                while ((line = reader.readLine()) != null) html.append(line).append('\n');
+            }
+            webView.loadDataWithBaseURL(
+                "https://offline.future-shijiao.local/",
+                html.toString(),
+                "text/html",
+                "UTF-8",
+                null
+            );
+        } catch (Throwable error) {
+            Log.e(TAG, "Offline fallback failed", error);
+            showError("无法加载离线演示", "请检查系统 WebView，或连接网络后点击重新加载。");
+        }
     }
 
     public boolean canGoBack() { return webView != null && webView.canGoBack(); }
@@ -190,6 +224,13 @@ public final class GuideWebView extends FrameLayout {
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
+    private boolean isRockchipDevice() {
+        String hardware = Build.HARDWARE == null ? "" : Build.HARDWARE.toLowerCase();
+        String board = Build.BOARD == null ? "" : Build.BOARD.toLowerCase();
+        String device = Build.DEVICE == null ? "" : Build.DEVICE.toLowerCase();
+        return hardware.contains("rk") || board.contains("rk") || device.contains("rk");
+    }
+
     private class SecureClient extends WebViewClient {
         @Override public void onPageStarted(WebView view, String url, Bitmap favicon) {
             errorPanel.setVisibility(GONE);
@@ -214,23 +255,25 @@ public final class GuideWebView extends FrameLayout {
         }
 
         @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            if (request.isForMainFrame()) showError("页面暂时无法打开", "请检查网络连接后重试；错误代码：" + error.getErrorCode());
+            if (request.isForMainFrame()) loadOfflineFallback("网络错误 " + error.getErrorCode());
         }
 
         @SuppressWarnings("deprecation")
         @Override public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-            showError("页面暂时无法打开", "请检查网络连接后重试；错误代码：" + errorCode);
+            if (failingUrl != null && failingUrl.startsWith(config.getBaseUrl())) {
+                loadOfflineFallback("网络错误 " + errorCode);
+            }
         }
 
         @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
             if (request.isForMainFrame() && response.getStatusCode() >= 500) {
-                showError("服务暂时不可用", "服务器返回 " + response.getStatusCode() + "，请稍后重试。");
+                loadOfflineFallback("服务返回 " + response.getStatusCode());
             }
         }
 
         @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
             handler.cancel();
-            showError("安全连接失败", "证书校验未通过，为保护数据已停止加载。请检查设备时间或联系管理员。");
+            loadOfflineFallback("安全连接校验失败");
         }
     }
 

@@ -16,7 +16,7 @@
 - 用户数据：导诊记录按用户隔离，包含审计日志表。
 - 前后台联动：医院、科室、医生、位置、宣教、导诊规则、号源和运营指标统一从数据库/API 读取；管理员修改内容后患者端同步更新。
 - 医院接口：主数据、排班号源、预约/取消、候诊队列、HMAC 鉴权、防重放、幂等与同步日志。
-- Android：最低 Android 5（API 21），目标 Android 16（API 36），同时产出 APK 与 AAR SDK；WebView 缺失、渲染进程退出、断网和证书错误均有原生恢复页。
+- Android：最低 Android 5（API 21），目标 Android 16（API 36），同时产出 APK 与 AAR SDK；RK3576 设备使用单 Activity 启动与软件渲染，断网自动进入 APK 内置离线演示页，WebView 缺失时显示原生恢复页。
 
 > 当前公网数据库中的医院与运营数据是演示数据，不代表真实医院业务。接口和状态机已实现，但正式挂号仍需医院提供 HIS/预约/叫号测试地址、字段和授权凭据。
 
@@ -55,7 +55,8 @@ npm run deploy
 
 Android 源码与接入说明见 `android/README.md`。
 
-- 演示 APK：`android/outputs/FutureShijiao-Demo-1.1.0-debug.apk`
-- AAR SDK：`android/outputs/FutureShijiao-Guide-SDK-1.1.0.aar`
+- RK3576 / Android 14 安装包：`android/outputs/FutureShijiao-RK3576-Android14-1.2.0.apk`
+- AAR SDK：`android/outputs/FutureShijiao-Guide-SDK-1.2.0.aar`
+- 设备安装说明：`android/INSTALL-RK3576.md`
 
-演示 APK 为调试签名；医院正式发布版本需要使用企业自有签名证书。
+APK 使用与上一演示包相同的测试证书，可直接覆盖安装；医院正式发布版本需要使用企业自有签名证书。

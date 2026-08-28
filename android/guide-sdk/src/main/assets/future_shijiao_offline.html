@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>未来仕角 · 离线导诊演示</title>
+  <style>
+    :root{--ink:#173a36;--muted:#647874;--green:#2f776e;--paper:#f7faf7;--line:#dce8e4;--coral:#f09a7c;--blue:#729ac4;--mint:#73aa8f;--violet:#8877aa}
+    *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans SC","Microsoft YaHei",sans-serif;color:var(--ink);background:linear-gradient(145deg,#fbfcf9,#edf6f2);min-height:100vh}
+    button,input{font:inherit}.shell{max-width:1180px;margin:auto;padding:26px 34px 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{display:flex;align-items:center;gap:12px}.mark{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;background:var(--ink);color:#fff;font-size:22px;font-weight:700}.brand b{display:block;font-size:21px}.brand small{color:var(--muted)}.offline{padding:9px 14px;border-radius:99px;background:#fff3d5;color:#835c11;font-size:13px;border:1px solid #f2d99b}
+    .hero{display:grid;grid-template-columns:1.18fr .82fr;align-items:center;min-height:330px;margin-top:28px;padding:46px;border-radius:32px;background:#fff;box-shadow:0 18px 60px #173a3614}.eyebrow{color:var(--green);font-size:13px;font-weight:700;letter-spacing:2px}.hero h1{font-size:44px;line-height:1.18;margin:14px 0}.hero p{color:var(--muted);font-size:17px;line-height:1.8}.primary{border:0;border-radius:14px;background:var(--green);color:#fff;padding:15px 23px;font-weight:700;cursor:pointer}.bot-wrap{display:grid;place-items:center}.bot{width:174px;height:154px;border-radius:48% 48% 42% 42%;background:linear-gradient(145deg,#e5f4ef,#bfded4);border:7px solid #fff;box-shadow:0 24px 48px #2f776e33;position:relative}.bot:before,.bot:after{content:"";position:absolute;top:64px;width:16px;height:24px;border-radius:50%;background:var(--ink)}.bot:before{left:50px}.bot:after{right:50px}.cross{position:absolute;left:64px;top:13px;width:44px;height:34px;color:#d36c58;text-align:center;font-size:34px;font-weight:700}
+    h2{font-size:28px;margin:34px 0 17px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.card{border:1px solid var(--line);background:#ffffffd9;border-radius:20px;padding:22px;text-align:left;color:var(--ink);cursor:pointer;min-height:142px}.card span{display:grid;place-items:center;width:43px;height:43px;border-radius:13px;background:#e8f3ef;font-size:22px}.card b{display:block;font-size:18px;margin:14px 0 6px}.card small{color:var(--muted)}
+    .panel{display:none;margin-top:26px;background:#fff;border-radius:28px;padding:34px;box-shadow:0 18px 60px #173a3611}.panel.active{display:block}.back{border:0;background:none;color:var(--green);font-weight:700;padding:0;cursor:pointer}.symptoms{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.chip{border:1px solid var(--line);background:#f7faf8;border-radius:99px;padding:10px 14px;color:var(--ink)}input{width:100%;padding:16px;border:1px solid var(--line);border-radius:13px;outline:none;font-size:16px}.result{margin-top:18px;padding:22px;border-radius:18px;background:#edf7f3}.result strong{font-size:24px;color:var(--green)}.list{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.row{padding:18px;border:1px solid var(--line);border-radius:16px}.row b{display:block;margin-bottom:8px}.row small{color:var(--muted)}.notice{margin-top:28px;color:var(--muted);font-size:13px;line-height:1.7}
+    @media(max-width:760px){.shell{padding:18px}.hero{grid-template-columns:1fr;padding:28px}.hero h1{font-size:34px}.bot-wrap{display:none}.grid{grid-template-columns:repeat(2,1fr)}.list{grid-template-columns:1fr}.offline{font-size:11px}.brand small{display:none}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top"><div class="brand"><span class="mark">角</span><span><b>未来仕角</b><small>安心就医 · 一路相伴</small></span></div><span class="offline">● 当前为离线演示模式</span></header>
+    <section id="home">
+      <div class="hero"><div><span class="eyebrow">AI 智慧导诊服务</span><h1>您好，我是小安<br>您的智能导医助手</h1><p>当前设备未联网，已自动启用 APK 内置页面。<br>您仍可演示导诊、科室和院内导航。</p><button class="primary" onclick="openPanel('triage')">开始智能导诊</button></div><div class="bot-wrap"><div class="bot"><i class="cross">＋</i></div></div></div>
+      <h2>常用服务</h2><div class="grid">
+        <button class="card" onclick="openPanel('triage')"><span>✦</span><b>智能导诊</b><small>描述症状，推荐科室</small></button>
+        <button class="card" onclick="openPanel('guide')"><span>⌁</span><b>院内导航</b><small>查地点与行走路线</small></button>
+        <button class="card" onclick="openPanel('departments')"><span>＋</span><b>科室介绍</b><small>特色专科与楼层</small></button>
+        <button class="card" onclick="openPanel('doctors')"><span>♙</span><b>医生介绍</b><small>擅长方向与出诊时间</small></button>
+      </div>
+    </section>
+    <section id="triage" class="panel"><button class="back" onclick="home()">← 返回首页</button><h2>请描述哪里不舒服</h2><input id="symptom" placeholder="例如：头晕、胸闷、关节疼痛"><div class="symptoms"><button class="chip" onclick="choose('头痛 / 头晕')">头痛 / 头晕</button><button class="chip" onclick="choose('胸闷 / 心慌')">胸闷 / 心慌</button><button class="chip" onclick="choose('关节 / 腰背痛')">关节 / 腰背痛</button><button class="chip" onclick="choose('儿童发热')">儿童发热</button></div><button class="primary" onclick="recommend()">生成科室建议</button><div id="answer"></div><p class="notice">本服务仅提供就医引导，不替代医生诊断；严重胸痛、呼吸困难、意识不清或大量出血时，请立即拨打 120。</p></section>
+    <section id="guide" class="panel"><button class="back" onclick="home()">← 返回首页</button><h2>院内位置</h2><div class="list"><div class="row"><b>门诊大厅</b><small>门诊楼 1F · 办卡、咨询与自助服务</small></div><div class="row"><b>心血管内科</b><small>门诊楼 3F A 区 · 2 号电梯后左转</small></div><div class="row"><b>检验科</b><small>医技楼 2F · 门诊采血与检验</small></div><div class="row"><b>门诊药房</b><small>门诊楼 1F 西侧 · 门诊取药窗口</small></div></div></section>
+    <section id="departments" class="panel"><button class="back" onclick="home()">← 返回首页</button><h2>科室介绍</h2><div class="list"><div class="row"><b>心血管内科</b><small>胸闷、心悸、高血压 · 门诊楼 3F A 区</small></div><div class="row"><b>神经内科</b><small>头痛、眩晕、肢体麻木 · 门诊楼 3F C 区</small></div><div class="row"><b>骨科</b><small>骨关节、脊柱、运动损伤 · 门诊楼 4F B 区</small></div><div class="row"><b>儿科</b><small>儿童常见病与生长发育 · 门诊楼 2F A 区</small></div></div></section>
+    <section id="doctors" class="panel"><button class="back" onclick="home()">← 返回首页</button><h2>医生介绍</h2><div class="list"><div class="row"><b>周明远 · 主任医师</b><small>心血管内科 · 冠心病、高血压及心律失常</small></div><div class="row"><b>林悦 · 副主任医师</b><small>神经内科 · 头痛、眩晕与脑血管病</small></div><div class="row"><b>陈思齐 · 主任医师</b><small>骨科 · 关节损伤、脊柱与运动医学</small></div></div></section>
+  </main>
+  <script>
+    function openPanel(id){document.getElementById('home').style.display='none';document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');scrollTo(0,0)}
+    function home(){document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));document.getElementById('home').style.display='block';scrollTo(0,0)}
+    function choose(text){document.getElementById('symptom').value=text}
+    function recommend(){const value=document.getElementById('symptom').value.trim();if(!value){document.getElementById('answer').innerHTML='<div class="result">请先输入或选择症状。</div>';return}let dept='全科医学科',place='门诊楼 2F C 区';if(/胸|心慌/.test(value)){dept='心血管内科';place='门诊楼 3F A 区'}else if(/头|眩晕/.test(value)){dept='神经内科';place='门诊楼 3F C 区'}else if(/关节|腰|背/.test(value)){dept='骨科';place='门诊楼 4F B 区'}else if(/儿童|小孩|发热/.test(value)){dept='儿科';place='门诊楼 2F A 区'}document.getElementById('answer').innerHTML='<div class="result">建议优先前往<br><strong>'+dept+'</strong><br><small>'+place+' · 最终以现场分诊和医生判断为准</small></div>'}
+  </script>
+</body>
+</html>
