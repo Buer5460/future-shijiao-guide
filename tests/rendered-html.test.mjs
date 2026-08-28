@@ -66,6 +66,7 @@ test("ships hospital content without publishing stale insurance rates", async ()
   assert.match(androidConfig, /offlineOnly\(true\)/);
   assert.match(androidManifest, /android\.permission\.INTERNET/);
   assert.match(androidManifest, /android\.permission\.ACCESS_NETWORK_STATE/);
-  assert.match(androidBuild, /versionCode 6/);
-  assert.match(androidBuild, /versionName "1\.4\.1"/);
+  assert.match(androidBuild, /versionCode 7/);
+  assert.match(androidBuild, /versionName "1\.4\.2"/);
+  assert.doesNotMatch(androidConfig, /enterKioskDisplayMode/);
 });

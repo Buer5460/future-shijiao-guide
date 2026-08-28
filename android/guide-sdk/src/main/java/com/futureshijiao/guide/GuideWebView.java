@@ -117,7 +117,7 @@ public final class GuideWebView extends FrameLayout {
             settings.setSupportZoom(false);
             settings.setBuiltInZoomControls(false);
             settings.setDisplayZoomControls(false);
-            settings.setUserAgentString(settings.getUserAgentString() + " FutureShijiaoAndroid/1.4.1-compat");
+            settings.setUserAgentString(settings.getUserAgentString() + " FutureShijiaoAndroid/1.4.2-startup-safe");
             if (Build.VERSION.SDK_INT >= 26) settings.setSafeBrowsingEnabled(true);
 
             CookieManager cookies = CookieManager.getInstance();

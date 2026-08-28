@@ -58,8 +58,8 @@ npm run deploy
 
 Android 源码与接入说明见 `android/README.md`。
 
-- RK3576 / Android 14 兼容安装包：`android/outputs/FutureShijiao-RK3576-Android14-Compatible-1.4.1.apk`
-- AAR SDK：`android/outputs/FutureShijiao-Guide-SDK-Compatible-1.4.1.aar`
+- RK3576 / Android 14 启动安全兼容包：`android/outputs/FutureShijiao-RK3576-Android14-StartupSafe-1.4.2.apk`
+- AAR SDK：`android/outputs/FutureShijiao-Guide-SDK-StartupSafe-1.4.2.aar`
 - 设备安装说明：`android/INSTALL-RK3576.md`
 
-兼容版与已确认可安装的 1.2.0 使用相同包名、签名、SDK、Manifest 和权限结构，版本号提升到 6；离线页面不发起公网请求。医院正式发布版本需要使用企业自有签名证书。
+兼容版与已确认可安装的 1.2.0 使用相同包名、签名、SDK、Manifest、权限和安全启动流程，版本号提升到 7；离线页面不发起公网请求。医院正式发布版本需要使用企业自有签名证书。
